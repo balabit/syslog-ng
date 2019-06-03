@@ -23,16 +23,18 @@
 
 package org.syslog_ng.elasticsearch_v2;
 
+import org.apache.log4j.Logger;
 import org.syslog_ng.LogMessage;
 import org.syslog_ng.LogTemplate;
 import org.syslog_ng.StructuredLogDestination;
 import org.syslog_ng.elasticsearch_v2.client.ESClient;
 import org.syslog_ng.elasticsearch_v2.client.ESClientFactory;
 import org.syslog_ng.elasticsearch_v2.client.UnknownESClientModeException;
-import org.syslog_ng.elasticsearch_v2.messageprocessor.ESIndex;
-import org.syslog_ng.options.InvalidOptionException;
+import org.syslog_ng.elasticsearch_v2.messageprocessor.http.IndexFieldHandler;
 import org.syslog_ng.logging.SyslogNgInternalLogger;
-import org.apache.log4j.Logger;
+import org.syslog_ng.options.InvalidOptionException;
+
+import java.util.function.Function;
 
 public class ElasticSearchDestination extends StructuredLogDestination {
 
@@ -40,14 +42,14 @@ public class ElasticSearchDestination extends StructuredLogDestination {
 	ElasticSearchOptions options;
 	Logger logger;
 
-	boolean opened;
+	volatile boolean opened;
 
 	public ElasticSearchDestination(long handle) {
 		super(handle);
 		logger = Logger.getRootLogger();
 		SyslogNgInternalLogger.register(logger);
 		options = new ElasticSearchOptions(this);
-	}
+  }
 
 	@Override
 	protected boolean init() {
@@ -60,7 +62,7 @@ public class ElasticSearchDestination extends StructuredLogDestination {
                         setBatchTimeout(options.getFlushTimeout());
 
 			client = ESClientFactory.getESClient(options);
-			client.init();
+			client.init(this::incDroppedMessages);
 			result = true;
 		}
 		catch (InvalidOptionException | UnknownESClientModeException e){
@@ -81,24 +83,28 @@ public class ElasticSearchDestination extends StructuredLogDestination {
 		return opened;
 	}
 
-    private ESIndex createIndexRequest(LogMessage msg) {
-    	String formattedMessage = options.getMessageTemplate().getResolvedString(msg, getTemplateOptionsHandle(), LogTemplate.LTZ_SEND);
-    	String customId = options.getCustomId().getResolvedString(msg, getTemplateOptionsHandle(), LogTemplate.LTZ_SEND);
-    	String index = options.getIndex().getResolvedString(msg, getTemplateOptionsHandle(), LogTemplate.LTZ_SEND);
-    	String type = options.getType().getResolvedString(msg, getTemplateOptionsHandle(), LogTemplate.LTZ_SEND);
-    	logger.debug("Outgoing log entry, json='" + formattedMessage + "'");
+	private static Object createIndexRequest(ElasticSearchDestination dest,
+																					 LogMessage msg,
+																					 IndexFieldHandler fieldsHandler) {
+		long templateHandler = dest.getTemplateOptionsHandle();
+		ElasticSearchOptions options = dest.options;
+		String formattedMessage = options.getMessageTemplate().getResolvedString(msg, templateHandler, LogTemplate.LTZ_SEND);
+		String customId = options.getCustomId().getResolvedString(msg, templateHandler, LogTemplate.LTZ_SEND);
+		String index = options.getIndex().getResolvedString(msg, templateHandler, LogTemplate.LTZ_SEND);
+		String type = options.getType().getResolvedString(msg, templateHandler, LogTemplate.LTZ_SEND);
+		String pipeline = options.getPipeline().getResolvedString(msg, templateHandler, LogTemplate.LTZ_SEND);
 
-		return new ESIndex.Builder().formattedMessage(formattedMessage).index(index).id(customId).type(type).build();
-    }
+		return fieldsHandler.handle(index, type, customId, pipeline, formattedMessage);
+	}
 
-	private int send_batch(ESIndex index) {
+	private int send_batch(Function<IndexFieldHandler, Object> index) {
 		if (client.send(index))
 			return QUEUED;
 		else
 			return ERROR;
 	}
 
-	private int send_single(ESIndex index) {
+	private int send_single(Function<IndexFieldHandler, Object> index) {
 		if (client.send(index))
 			return SUCCESS;
 		else
@@ -107,16 +113,23 @@ public class ElasticSearchDestination extends StructuredLogDestination {
 
 	@Override
 	protected int send(LogMessage msg) {
-		if (!client.isOpened()) {
-			return NOT_CONNECTED;
-		}
+		try {
+      if (!client.isOpened()) {
+        return NOT_CONNECTED;
+      }
 
-                ESIndex index = createIndexRequest(msg);
-		if (options.getFlushLimit() > 1)
-			return send_batch(index);
-		else
-			return send_single(index);
-	}
+      Function<IndexFieldHandler, Object> index = f -> createIndexRequest(this, msg, f);
+      if (options.getFlushLimit() > 1) {
+        return send_batch(index);
+      }
+      else {
+        return send_single(index);
+      }
+    } catch(Exception e) {
+		  logger.error("Exception in ES destination during send: " + e.getMessage(), e);
+		  throw e;
+    }
+  }
 
 	@Override
 	protected void close() {
@@ -128,7 +141,8 @@ public class ElasticSearchDestination extends StructuredLogDestination {
 
 	@Override
 	protected String getNameByUniqOptions() {
-		return String.format("ElasticSearch_v2,%s,%s", client.getClusterName(), options.getIndex().getValue());
+		return String.format("ElasticSearch_v2,%s,%s,%s", client.getClusterName(),
+						options.getIndex().getValue(), options.getIdentifier().getValue());
 	}
 
 	@Override
@@ -139,9 +153,14 @@ public class ElasticSearchDestination extends StructuredLogDestination {
 
 	@Override
 	public int flush() {
-		if (client.flush())
-			return SUCCESS;
-		else
+    try {
+      if (client.flush())
+        return SUCCESS;
+      else
+        return ERROR;
+    } catch (Exception e) {
+      logger.error("Exception in ES destination during flush: " + e.getMessage(), e);
 			return ERROR;
+    }
 	}
 }

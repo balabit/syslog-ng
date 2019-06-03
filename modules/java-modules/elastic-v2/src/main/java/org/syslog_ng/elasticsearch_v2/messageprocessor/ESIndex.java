@@ -23,17 +23,21 @@
 
 package org.syslog_ng.elasticsearch_v2.messageprocessor;
 
+import org.apache.commons.lang3.StringUtils;
+
 public class ESIndex {
 	private String formattedMessage;
 	private String index;
 	private String type;
 	private String id;
+	private String pipeline;
 
 	public static class Builder {
 		String formattedMessage;
 		String index;
 		String type;
 		String id;
+		String pipeline;
 
 		public Builder formattedMessage(String formattedMessage) {
 			Builder.this.formattedMessage = formattedMessage;
@@ -42,6 +46,11 @@ public class ESIndex {
 
 		public Builder index(String index) {
 			Builder.this.index = index;
+			return Builder.this;
+		}
+
+		public Builder pipeline(String pipeline) {
+			Builder.this.pipeline = pipeline;
 			return Builder.this;
 		}
 
@@ -65,6 +74,7 @@ public class ESIndex {
 		this.index = builder.index;
 		this.type = builder.type;
 		this.id = builder.id;
+  	this.pipeline = builder.pipeline;
 	}
 
 	public String getFormattedMessage() {
@@ -78,6 +88,8 @@ public class ESIndex {
 	public String getType() {
 		return type;
 	}
+
+	public String getPipeline() { return pipeline; }
 
 	public String getId() {
 		return id;

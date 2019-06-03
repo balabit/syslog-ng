@@ -99,6 +99,13 @@ Java_org_syslog_1ng_LogPipe_getConfigHandle(JNIEnv *env, jobject obj, jlong hand
   return (jlong)log_pipe_get_config(&self->super.super.super.super);
 }
 
+JNIEXPORT void JNICALL
+Java_org_syslog_1ng_LogDestination_incDroppedMessages(JNIEnv *env, jobject obj, jlong handle, jint batch_size)
+{
+  JavaDestDriver *self = (JavaDestDriver *)handle;
+  stats_counter_add(self->super.dropped_messages, batch_size);
+}
+
 void java_dd_set_option(LogDriver *s, const gchar *key, const gchar *value)
 {
   JavaDestDriver *self = (JavaDestDriver *)s;

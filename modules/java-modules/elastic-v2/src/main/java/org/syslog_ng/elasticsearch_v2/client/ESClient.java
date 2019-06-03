@@ -23,15 +23,20 @@
 
 package org.syslog_ng.elasticsearch_v2.client;
 
-import org.syslog_ng.elasticsearch_v2.messageprocessor.ESIndex;
+import org.syslog_ng.elasticsearch_v2.messageprocessor.http.IndexFieldHandler;
+
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
 
 public interface ESClient {
 	boolean open();
 	void close();
 	boolean isOpened();
-	void init();
+	void init(Consumer<Integer> incDroppedBatchCounter);
 	void deinit();
-	boolean send(ESIndex index);
+	boolean send(Function<IndexFieldHandler, Object> messageBuilder);
 	String getClusterName();
 	boolean flush();
 }

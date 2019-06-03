@@ -35,6 +35,7 @@ import org.syslog_ng.options.*;
 
 public class ElasticSearchOptions {
 
+	public static String IDENTIFIER = "identifier";
 	public static String SERVER = "server";
 	public static String PORT = "port";
 	public static String CLUSTER = "cluster";
@@ -48,6 +49,7 @@ public class ElasticSearchOptions {
 	public static String CONFIG_FILE = "resource";
 	public static String CONCURRENT_REQUESTS = "concurrent_requests";
 	public static String CLUSTER_URL = "cluster_url";
+	public static String PIPELINE = "pipeline";
 
 	public static String SERVER_DEFAULT = "localhost";
 	private static final String PORT_DEFAULT = "0";
@@ -108,6 +110,8 @@ public class ElasticSearchOptions {
 		return options.get(optionName);
 	}
 
+	public TemplateOption getIdentifier() { return options.getTemplateOption(IDENTIFIER); }
+
 	public TemplateOption getMessageTemplate() {
 		return options.getTemplateOption(MESSAGE_TEMPLATE);
 	}
@@ -119,6 +123,8 @@ public class ElasticSearchOptions {
 	public TemplateOption getIndex() {
 		return options.getTemplateOption(INDEX);
 	}
+
+	public TemplateOption getPipeline() { return options.getTemplateOption(PIPELINE);	}
 
 	public TemplateOption getType() {
 		return options.getTemplateOption(TYPE);
@@ -223,8 +229,10 @@ public class ElasticSearchOptions {
 	private void fillTemplateOptions() {
 		options.put(new TemplateOption(owner.getConfigHandle(), new RequiredOptionDecorator(new StringOption(owner, INDEX))));
 		options.put(new TemplateOption(owner.getConfigHandle(), new RequiredOptionDecorator(new StringOption(owner, TYPE))));
+		options.put(new TemplateOption(owner.getConfigHandle(), new StringOption(owner, PIPELINE)));
 		options.put(new TemplateOption(owner.getConfigHandle(), new StringOption(owner, MESSAGE_TEMPLATE, MESSAGE_TEMPLATE_DEFAULT)));
 		options.put(new TemplateOption(owner.getConfigHandle(), new StringOption(owner, CUSTOM_ID)));
+		options.put(new TemplateOption(owner.getConfigHandle(), new StringOption(owner, IDENTIFIER)));
 	}
 
 	private void fillStringOptions() {

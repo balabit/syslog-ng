@@ -46,3 +46,16 @@ dbld/rules.conf
 debian/build-tree/
 debian/*.log
 debian/autoreconf.*
+*.lo
+*grammar.c
+*grammar.h
+*grammar.y
+*.la
+*.o
+.dirstamp
+.libs
+modules/java-modules/*/gradle
+.gradle
+gradle*
+.idea
+**/out

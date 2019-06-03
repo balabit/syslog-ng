@@ -2,6 +2,7 @@
  * Copyright (c) 2016 Balabit
  * Copyright (c) 2016 Laszlo Budai <laszlo.budai@balabit.com>
  *
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published
  * by the Free Software Foundation, or (at your option) any later version.
@@ -21,12 +22,9 @@
  *
  */
 
-package org.syslog_ng.elasticsearch_v2.messageprocessor;
+package org.syslog_ng.elasticsearch_v2.messageprocessor.http;
 
-import org.syslog_ng.elasticsearch_v2.messageprocessor.http.IndexFieldHandler;
-
-import java.util.function.Function;
-
-public interface ESMessageProcessor {
-	boolean send(Function<IndexFieldHandler, Object> messageBuilder);
+@FunctionalInterface
+public interface IndexFieldHandler<T> {
+     T handle(String index, String type, String id, String pipeline, String formattedMessage);
 }

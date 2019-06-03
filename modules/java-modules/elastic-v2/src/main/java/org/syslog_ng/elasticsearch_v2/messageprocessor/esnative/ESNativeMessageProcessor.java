@@ -29,6 +29,9 @@ import org.syslog_ng.elasticsearch_v2.ElasticSearchOptions;
 import org.syslog_ng.elasticsearch_v2.client.esnative.ESNativeClient;
 import org.syslog_ng.elasticsearch_v2.messageprocessor.ESIndex;
 import org.syslog_ng.elasticsearch_v2.messageprocessor.ESMessageProcessor;
+import org.syslog_ng.elasticsearch_v2.messageprocessor.http.IndexFieldHandler;
+
+import java.util.function.Function;
 
 public abstract class ESNativeMessageProcessor implements ESMessageProcessor {
 	protected ElasticSearchOptions options;
@@ -57,8 +60,13 @@ public abstract class ESNativeMessageProcessor implements ESMessageProcessor {
 	protected abstract boolean send(IndexRequest req);
 
 	@Override
-	public final boolean send(ESIndex index) {
-		IndexRequest req = new IndexRequest(index.getIndex(), index.getType(), index.getId()).source(index.getFormattedMessage());
+	public boolean send(Function<IndexFieldHandler, Object> messageBuilder) {
+
+		IndexRequest req = (IndexRequest) messageBuilder.apply(((index, type, id, pipeline, formattedMessage) -> {
+			return new IndexRequest(index, type, id).source(formattedMessage);
+		}));
+
 		return send(req);
 	}
+
 }

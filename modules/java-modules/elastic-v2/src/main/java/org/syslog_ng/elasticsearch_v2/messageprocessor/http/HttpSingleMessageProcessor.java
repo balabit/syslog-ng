@@ -26,10 +26,12 @@ package org.syslog_ng.elasticsearch_v2.messageprocessor.http;
 
 import io.searchbox.core.Index;
 import io.searchbox.client.JestResult;
+import io.searchbox.core.JestIndex;
 import org.syslog_ng.elasticsearch_v2.ElasticSearchOptions;
 import org.syslog_ng.elasticsearch_v2.client.http.ESHttpClient;
 
 import java.io.IOException;
+import java.util.function.Function;
 
 public class HttpSingleMessageProcessor extends  HttpMessageProcessor {
 
@@ -38,7 +40,12 @@ public class HttpSingleMessageProcessor extends  HttpMessageProcessor {
 	}
 
 	@Override
-	public boolean send(Index req) {
+	public boolean sendImpl(Function<IndexFieldHandler, Object> msgBuilder) {
+
+		JestIndex req = (JestIndex) msgBuilder.apply((index, type, id, pipeline, formattedMessage) ->
+						new JestIndex().setIndexName(index).setType(type).setId(id)
+						.setFormattedMessage(formattedMessage));
+
 	  JestResult jestResult = null;
 		try {
 			jestResult = client.getClient().execute(req);
@@ -56,3 +63,4 @@ public class HttpSingleMessageProcessor extends  HttpMessageProcessor {
 	}
 
 }
+

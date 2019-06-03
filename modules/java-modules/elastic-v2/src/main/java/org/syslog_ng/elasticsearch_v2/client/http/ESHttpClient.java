@@ -24,37 +24,25 @@
 
 package org.syslog_ng.elasticsearch_v2.client.http;
 
+import io.searchbox.client.ESJestClientFactory;
 import io.searchbox.client.JestClient;
 import io.searchbox.client.JestClientFactory;
 import io.searchbox.client.JestResult;
 import io.searchbox.client.config.HttpClientConfig;
 import io.searchbox.cluster.NodesInfo;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
+import org.apache.log4j.PropertyConfigurator;
 import org.syslog_ng.elasticsearch_v2.ElasticSearchOptions;
 import org.syslog_ng.elasticsearch_v2.client.ESClient;
-import org.syslog_ng.elasticsearch_v2.messageprocessor.ESIndex;
 import org.syslog_ng.elasticsearch_v2.messageprocessor.ESMessageProcessorFactory;
 import org.syslog_ng.elasticsearch_v2.messageprocessor.http.HttpMessageProcessor;
-import java.util.Set;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.HostnameVerifier;
-import org.apache.http.conn.ssl.DefaultHostnameVerifier;
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.conn.ssl.TrustStrategy;
-import org.apache.http.ssl.SSLContextBuilder;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.nio.conn.SchemeIOSessionStrategy;
-import org.apache.http.nio.conn.ssl.SSLIOSessionStrategy;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-import java.security.UnrecoverableKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.io.FileInputStream;
-import org.apache.log4j.PropertyConfigurator;
+import org.syslog_ng.elasticsearch_v2.messageprocessor.http.IndexFieldHandler;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class ESHttpClient implements ESClient {
 	private ElasticSearchOptions options;
@@ -62,9 +50,16 @@ public class ESHttpClient implements ESClient {
 	private JestClient client;
 	private HttpMessageProcessor messageProcessor;
 	protected Logger logger;
+	private Consumer<Integer> incDroppedBatchCounter;
 
   static  {
-      PropertyConfigurator.configure(System.getProperty("log4j.configuration"));
+		final String log4jPath = System.getProperty("log4j.configuration");
+		if (StringUtils.isNotBlank(log4jPath)) {
+			final File f = new File(log4jPath);
+			if (f.isFile()) {
+				PropertyConfigurator.configure(f.getAbsolutePath());
+			}
+		}
   }
 
 
@@ -93,22 +88,28 @@ public class ESHttpClient implements ESClient {
   protected void setupHttpClientBuilder(HttpClientConfig.Builder httpClientConfigBuilder, ElasticSearchOptions options) {}
 
   private HttpClientConfig buildHttpClientConfig() {
+		int concurrentRequests = options.getConcurrentRequests();
+		int totalRoutes = options.getClusterUrls().size();
+		String connPoolTimes = System.getProperty("HttpConnectionPoolTimes", "3");
  		HttpClientConfig.Builder httpClientConfigBuilder = new HttpClientConfig
 			.Builder(options.getClusterUrls())
 			.multiThreaded(true)
+						.defaultMaxTotalConnectionPerRoute(concurrentRequests)
+						.maxTotalConnection(concurrentRequests * Integer.valueOf(connPoolTimes))
 			.defaultSchemeForDiscoveredNodes(options.getClientMode());
 
 		/* HTTP Basic authentication requested */
 		if (options.getHttpAuthType().equals("basic")) {
 			httpClientConfigBuilder.defaultCredentials(options.getHttpAuthTypeBasicUsername(), options.getHttpAuthTypeBasicPassword());
     }
+    httpClientConfigBuilder.readTimeout(30000);
     setupHttpClientBuilder(httpClientConfigBuilder, this.options);
 
     return httpClientConfigBuilder.build();
   }
 
 	private JestClient createClient() {
-		JestClientFactory clientFactory = new JestClientFactory();
+    ESJestClientFactory clientFactory = new ESJestClientFactory();
 	  clientFactory.setHttpClientConfig(buildHttpClientConfig());
 		return clientFactory.getObject();
 	}
@@ -116,6 +117,11 @@ public class ESHttpClient implements ESClient {
 	public JestClient getClient() {
 		return client;
 	}
+
+	public synchronized void incDroppedBatchCounter(int batchSize) {
+  	if(incDroppedBatchCounter != null)
+  		this.incDroppedBatchCounter.accept(batchSize);
+  }
 
 	@Override
 	public boolean open() {
@@ -134,6 +140,8 @@ public class ESHttpClient implements ESClient {
 
 	@Override
 	public void close() {
+		messageProcessor.flush();
+		messageProcessor.deinit();
 	}
 
 	@Override
@@ -142,8 +150,9 @@ public class ESHttpClient implements ESClient {
 	}
 
 	@Override
-	public void init() {
+	public void init(Consumer<Integer> incDroppedBatchCounter) {
 		this.client = createClient();
+		this.incDroppedBatchCounter = incDroppedBatchCounter;
 	}
 
 	@Override
@@ -153,8 +162,8 @@ public class ESHttpClient implements ESClient {
 	}
 
 	@Override
-	public boolean send(ESIndex index) {
-		return messageProcessor.send(index);
+	public boolean send(Function<IndexFieldHandler, Object> messageBuilder) {
+		return messageProcessor.send(messageBuilder);
 	}
 
 	@Override
@@ -164,7 +173,12 @@ public class ESHttpClient implements ESClient {
 		try {
 			JestResult result = client.execute(nodesinfo);
 			if (result != null ) {
-				clusterName = result.getValue("cluster_name").toString();
+				Object cname = result.getValue("cluster_name");
+				if(cname != null) {
+					clusterName = result.getValue("cluster_name").toString();
+				} else {
+					logger.info("Failed to get cluster name from the client, use the name set in the config file: " + clusterName);
+				}
 			}
 		} catch (IOException e) {
       logger.info("Failed to get cluster name from the client, use the name set in the config file: " + clusterName);

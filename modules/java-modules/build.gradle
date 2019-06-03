@@ -7,6 +7,7 @@ subprojects {
     apply plugin: 'idea'
 
     repositories {
+      mavenLocal()
         maven {
           url "/usr/lib/syslog-ng-java-compile-deps-mvn-repo"
         }
@@ -18,8 +19,8 @@ subprojects {
     }
 
     compileJava {
-        sourceCompatibility "1.7"
-        targetCompatibility "1.7"
+        sourceCompatibility "1.8"
+        targetCompatibility "1.8"
     }
 }
 

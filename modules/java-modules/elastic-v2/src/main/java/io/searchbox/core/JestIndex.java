@@ -2,6 +2,7 @@
  * Copyright (c) 2016 Balabit
  * Copyright (c) 2016 Laszlo Budai <laszlo.budai@balabit.com>
  *
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published
  * by the Free Software Foundation, or (at your option) any later version.
@@ -21,12 +22,31 @@
  *
  */
 
-package org.syslog_ng.elasticsearch_v2.messageprocessor;
+package io.searchbox.core;
 
-import org.syslog_ng.elasticsearch_v2.messageprocessor.http.IndexFieldHandler;
+public final class JestIndex extends Index {
 
-import java.util.function.Function;
+  public JestIndex() { super(new Index.Builder(null)); }
 
-public interface ESMessageProcessor {
-	boolean send(Function<IndexFieldHandler, Object> messageBuilder);
+
+  public JestIndex setIndexName(final String index) {
+    super.indexName = index;
+    return this;
+  }
+
+  public JestIndex setId(final String id) {
+    super.id = id;
+    return this;
+  }
+
+  public JestIndex setType(final String type) {
+    super.typeName = type;
+    return this;
+  }
+
+  public JestIndex setFormattedMessage(final String message) {
+    super.payload = message;
+    return this;
+  }
+
 }

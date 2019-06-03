@@ -26,6 +26,8 @@ package org.syslog_ng.elasticsearch_v2.client.esnative;
 import java.io.File;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.apache.log4j.Logger;
 import org.elasticsearch.ElasticsearchException;
@@ -40,6 +42,7 @@ import org.syslog_ng.elasticsearch_v2.client.ESClient;
 import org.syslog_ng.elasticsearch_v2.messageprocessor.ESIndex;
 import org.syslog_ng.elasticsearch_v2.messageprocessor.ESMessageProcessorFactory;
 import org.syslog_ng.elasticsearch_v2.messageprocessor.esnative.ESNativeMessageProcessor;
+import org.syslog_ng.elasticsearch_v2.messageprocessor.http.IndexFieldHandler;
 
 public abstract class ESNativeClient implements ESClient {
 	private Client client;
@@ -113,7 +116,7 @@ public abstract class ESNativeClient implements ESClient {
 
 	public abstract void deinit();
 
-	public final void init() {
+	public final void init(Consumer<Integer> incDroppedBatchCounter) {
 		client = createClient();
 	}
 
@@ -140,8 +143,8 @@ public abstract class ESNativeClient implements ESClient {
     }
 
 	@Override
-	public boolean send(ESIndex index) {
-		return messageProcessor.send(index);
+	public boolean send(Function<IndexFieldHandler, Object> messageBuilder) {
+		return messageProcessor.send(messageBuilder);
 	}
 
 	@Override

@@ -24,13 +24,12 @@
 
 package org.syslog_ng.elasticsearch_v2.messageprocessor.http;
 
-import io.searchbox.core.Index;
 import org.apache.log4j.Logger;
 import org.syslog_ng.elasticsearch_v2.ElasticSearchOptions;
 import org.syslog_ng.elasticsearch_v2.client.http.ESHttpClient;
-import org.syslog_ng.elasticsearch_v2.messageprocessor.ESIndex;
 import org.syslog_ng.elasticsearch_v2.messageprocessor.ESMessageProcessor;
-import java.io.IOException;
+
+import java.util.function.Function;
 
 public abstract class HttpMessageProcessor implements ESMessageProcessor {
 	protected ElasticSearchOptions options;
@@ -54,11 +53,11 @@ public abstract class HttpMessageProcessor implements ESMessageProcessor {
 
 	}
 
-	protected abstract boolean send(Index req);
+	protected abstract boolean sendImpl(Function<IndexFieldHandler, Object> msgBuilder);
 
 	@Override
-	public boolean send(ESIndex index) {
-		Index req = new Index.Builder(index.getFormattedMessage()).index(index.getIndex()).type(index.getType()).id(index.getId()).build();
-		return send(req);
+	public boolean send(Function<IndexFieldHandler, Object> messageBuilder) {
+		return sendImpl(messageBuilder);
 	}
+
 }

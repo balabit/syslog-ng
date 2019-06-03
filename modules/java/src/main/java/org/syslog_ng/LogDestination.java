@@ -61,6 +61,10 @@ public abstract class LogDestination extends LogPipe {
  		setBatchTimeout(getHandle(), timeout);
         }
 
+  public void incDroppedMessages(int batch_size) {
+    incDroppedMessages(getHandle(), batch_size);
+  }
+
 	protected abstract boolean open();
 
 	protected abstract void close();
@@ -71,7 +75,7 @@ public abstract class LogDestination extends LogPipe {
 
 	private native String getOption(long ptr, String key);
 
-	private native long getTemplateOptionsHandle(long ptr);
+  private native long getTemplateOptionsHandle(long ptr);
 
 	private native int getSeqNum(long ptr);
 
@@ -84,6 +88,8 @@ public abstract class LogDestination extends LogPipe {
 	protected int flush() {
 		return SUCCESS;
 	}
+
+  private native void incDroppedMessages(long ptr, int batch_size);
 
 	public boolean openProxy() {
 		try {
