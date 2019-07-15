@@ -61,6 +61,34 @@ slng_reload(int argc, char *argv[], const gchar *mode, GOptionContext *ctx)
   return dispatch_command("RELOAD");
 }
 
+static gboolean config_options_start = FALSE;
+static gboolean config_options_stop = FALSE;
+
+static GOptionEntry internal_options[] =
+{
+  { "start", 's', 0, G_OPTION_ARG_NONE, &config_options_start, "start live collection of internal logs", NULL },
+  { "stop", 'x', 0, G_OPTION_ARG_NONE, &config_options_stop, "stop live collection of internal logs", NULL },
+  { NULL,           0,   0, G_OPTION_ARG_NONE, NULL,                         NULL,           NULL }
+};
+
+static gint
+slng_internal(int argc, char *argv[], const gchar *mode, GOptionContext *ctx)
+{
+  GString *cmd = g_string_new("");
+
+  if (config_options_start)
+    g_string_assign(cmd, "INTERLOGS START");
+  else if (config_options_stop)
+    g_string_assign(cmd, "INTERLOGS STOP");
+  else
+    return 1;
+
+  gint res = dispatch_command(cmd->str);
+  g_string_free(cmd, TRUE);
+
+  return res;
+}
+
 static gint
 slng_reopen(int argc, char *argv[], const gchar *mode, GOptionContext *ctx)
 {
@@ -122,6 +150,7 @@ static CommandDescriptor modes[] =
   { "config", config_options, "Print current config", slng_config, NULL },
   { "list-files", no_options, "Print files present in config", slng_listfiles, NULL },
   { "export-config-graph", no_options, "export configuration graph", slng_export_config_graph, NULL },
+  { "internal-logs", internal_options, "Collect internal syslog-ng logs", slng_internal, NULL },
   { NULL, NULL },
 };
 
