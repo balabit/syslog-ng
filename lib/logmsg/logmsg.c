@@ -530,6 +530,8 @@ log_msg_set_value(LogMessage *self, NVHandle handle, const gchar *value, gssize 
 
   name_len = 0;
   name = log_msg_get_value_name(handle, &name_len);
+  if (!name)
+    return;
 
   if (_log_name_value_updates(self))
     {
