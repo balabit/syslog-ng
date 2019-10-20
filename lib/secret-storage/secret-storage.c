@@ -79,6 +79,7 @@ void
 secret_storage_deinit(void)
 {
   g_assert(!secret_manager_uninitialized);
+  g_atomic_int_inc(&secret_manager_uninitialized);
   g_hash_table_destroy(secret_manager);
   secret_manager = NULL;
 }
