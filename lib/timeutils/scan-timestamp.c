@@ -328,7 +328,7 @@ __parse_usec(const guchar **data, gint *length)
           src++;
           (*length)--;
         }
-      while (isdigit(*src))
+      while (*length > 0 && isdigit(*src))
         {
           src++;
           (*length)--;
