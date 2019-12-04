@@ -41,7 +41,6 @@ static const char aix_fwd_string[] = "Message forwarded from ";
 static const char repeat_msg_string[] = "last message repeated";
 static struct
 {
-  gboolean initialized;
   NVHandle is_synced;
   NVHandle cisco_seqid;
   NVHandle raw_message;
@@ -1041,13 +1040,9 @@ syslog_format_handler(const MsgFormatOptions *parse_options,
 void
 syslog_format_init(void)
 {
-  if (!handles.initialized)
-    {
-      handles.is_synced = log_msg_get_value_handle(".SDATA.timeQuality.isSynced");
-      handles.cisco_seqid = log_msg_get_value_handle(".SDATA.meta.sequenceId");
-      handles.raw_message = log_msg_get_value_handle("RAWMSG");
-      handles.initialized = TRUE;
-    }
+  handles.is_synced = log_msg_get_value_handle(".SDATA.timeQuality.isSynced");
+  handles.cisco_seqid = log_msg_get_value_handle(".SDATA.meta.sequenceId");
+  handles.raw_message = log_msg_get_value_handle("RAWMSG");
 
   _init_parse_hostname_invalid_chars();
 }
