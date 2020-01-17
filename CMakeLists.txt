@@ -393,9 +393,10 @@ if (FUZZER AND NOT ("${CMAKE_C_COMPILER_ID}" MATCHES "Clang"))
 endif()
 
 if (NOT SANITIZER AND FUZZER)
-  set(SANITIZER "")
+  set(SANITIZER "fuzzer")
+elseif(FUZZER)
+  set(SANITIZER "${SANITIZER},fuzzer")
 endif()
-
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/syslog-ng-config.h.in ${CMAKE_CURRENT_BINARY_DIR}/syslog-ng-config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
