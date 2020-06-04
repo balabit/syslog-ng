@@ -25,14 +25,12 @@
 #include "kafka-dest-worker.h"
 #include "kafka-dest-driver.h"
 #include "str-utils.h"
-#include "timeutils/misc.h"
 #include <zlib.h>
 
 
 typedef struct _KafkaDestWorker
 {
   LogThreadedDestWorker super;
-  struct iv_timer poll_timer;
   GString *key;
   GString *message;
 } KafkaDestWorker;
@@ -57,7 +55,7 @@ _publish_message(KafkaDestWorker *self, LogMessage *msg)
 
   if (rd_kafka_produce(owner->topic,
                        RD_KAFKA_PARTITION_UA,
-                       RD_KAFKA_MSG_F_FREE | RD_KAFKA_MSG_F_BLOCK,
+                       RD_KAFKA_MSG_F_FREE,
                        self->message->str, self->message->len,
                        self->key->len ? self->key->str : NULL, self->key->len,
                        log_msg_ref(msg)) == -1)
@@ -83,45 +81,6 @@ _publish_message(KafkaDestWorker *self, LogMessage *msg)
   return TRUE;
 }
 
-static void
-_update_drain_timer(KafkaDestWorker *self)
-{
-  KafkaDestDriver *owner = (KafkaDestDriver *) self->super.owner;
-
-  if (self->super.worker_index != 0)
-    return;
-
-  if (iv_timer_registered(&self->poll_timer))
-    iv_timer_unregister(&self->poll_timer);
-  iv_validate_now();
-  self->poll_timer.expires = iv_now;
-  timespec_add_msec(&self->poll_timer.expires, owner->poll_timeout);
-  iv_timer_register(&self->poll_timer);
-}
-
-static void
-_drain_responses(KafkaDestWorker *self)
-{
-  KafkaDestDriver *owner = (KafkaDestDriver *) self->super.owner;
-
-  /* we are only draining responses in the first worker thread, so all
-   * callbacks originate from the same thread and we don't need to
-   * synchronize between workers */
-  if (self->super.worker_index != 0)
-    return;
-
-  gint count = rd_kafka_poll(owner->kafka, 0);
-  if (count != 0)
-    {
-      msg_trace("kafka: destination side rd_kafka_poll() processed some responses",
-                evt_tag_str("topic", owner->topic_name),
-                evt_tag_int("count", count),
-                evt_tag_str("driver", owner->super.super.super.id),
-                log_pipe_location_tag(&owner->super.super.super.super));
-    }
-  _update_drain_timer(self);
-}
-
 /*
  * Worker thread
  */
@@ -131,13 +90,27 @@ kafka_dest_worker_insert(LogThreadedDestWorker *s, LogMessage *msg)
 {
   KafkaDestWorker *self = (KafkaDestWorker *)s;
 
-  _drain_responses(self);
-
   _format_message_and_key(self, msg);
+  // rdkafka buffer is full
   if (!_publish_message(self, msg))
     return LTR_RETRY;
 
-  _drain_responses(self);
+  return LTR_SUCCESS;
+}
+
+static LogThreadedResult
+kafka_dest_worker_flush(LogThreadedDestWorker *s, LogThreadedFlushMode mode)
+{
+  KafkaDestDriver* owner = (KafkaDestDriver*) s->owner;
+  gint count = rd_kafka_poll(owner->kafka, 0);
+  if (count != 0)
+    {
+      msg_trace("kafka: destination side (worker) rd_kafka_poll() processed some responses",
+                evt_tag_str("topic", owner->topic_name),
+                evt_tag_int("count", count),
+                evt_tag_str("driver", owner->super.super.super.id),
+                log_pipe_location_tag(&owner->super.super.super.super));
+    }
   return LTR_SUCCESS;
 }
 
@@ -157,11 +130,8 @@ kafka_dest_worker_new(LogThreadedDestDriver *o, gint worker_index)
 
   log_threaded_dest_worker_init_instance(&self->super, o, worker_index);
   self->super.insert = kafka_dest_worker_insert;
+  self->super.flush = kafka_dest_worker_flush;
   self->super.free_fn = kafka_dest_worker_free;
-
-  IV_TIMER_INIT(&self->poll_timer);
-  self->poll_timer.cookie = self;
-  self->poll_timer.handler = (void (*)(void *)) _drain_responses;
 
   self->key = g_string_sized_new(0);
   self->message = g_string_sized_new(1024);

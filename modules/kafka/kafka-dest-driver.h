@@ -44,6 +44,7 @@ typedef struct
   gint flush_timeout_on_shutdown;
   gint flush_timeout_on_reload;
   gint poll_timeout;
+  struct iv_timer poll_timer;
 } KafkaDestDriver;
 
 void kafka_dd_set_topic(LogDriver *d, const gchar *topic);

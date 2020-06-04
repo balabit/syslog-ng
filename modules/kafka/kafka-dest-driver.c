@@ -27,6 +27,8 @@
 #include "kafka-dest-driver.h"
 #include "kafka-props.h"
 #include "kafka-dest-worker.h"
+#include "timeutils/misc.h"
+#include "stats/stats-registry.h"
 
 #include <librdkafka/rdkafka.h>
 #include <stdlib.h>
@@ -152,35 +154,20 @@ _kafka_delivery_report_cb(rd_kafka_t *rk,
 {
   KafkaDestDriver *self = (KafkaDestDriver *) opaque;
   LogMessage *msg = (LogMessage *) msg_opaque;
+  log_msg_unref(msg);
 
-  /* we already ACKed back this message to syslog-ng, it was kept in
-   * librdkafka queues so far but successfully delivered, let's unref it */
-
-  if (err != RD_KAFKA_RESP_ERR_NO_ERROR)
-    {
-      LogThreadedDestWorker *worker = (LogThreadedDestWorker *) self->super.workers[0];
-      LogQueue *queue = worker->queue;
-      LogPathOptions path_options = LOG_PATH_OPTIONS_INIT;
-
-      msg_debug("kafka: delivery report for message came back with an error, putting it back to our queue",
-                evt_tag_str("topic", self->topic_name),
-                evt_tag_printf("message", "%.*s", (int) MIN(len, 128), (char *) payload),
-                evt_tag_str("error", rd_kafka_err2str(err)),
-                evt_tag_str("driver", self->super.super.super.id),
-                log_pipe_location_tag(&self->super.super.super.super));
-      log_queue_push_head(queue, msg, &path_options);
-      return;
-    }
-  else
-    {
-      msg_debug("kafka: delivery report successful",
-                evt_tag_str("topic", self->topic_name),
-                evt_tag_printf("message", "%.*s", (int) MIN(len, 128), (char *) payload),
-                evt_tag_str("error", rd_kafka_err2str(err)),
-                evt_tag_str("driver", self->super.super.super.id),
-                log_pipe_location_tag(&self->super.super.super.super));
-      log_msg_unref(msg);
-    }
+  if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
+    // message.send.max.retries exceeded the message was dropped because kafka
+    // isn't available.
+    stats_counter_inc(self->super.dropped_messages);
+    msg_trace("kafka: dropped a message",
+              evt_tag_str("topic", self->topic_name),
+              evt_tag_str("error", rd_kafka_err2str(err)),
+              evt_tag_str("driver", self->super.super.super.id),
+              log_pipe_location_tag(&self->super.super.super.super));
+  } else {
+    stats_counter_inc(self->super.written_messages);
+  }
 }
 
 static void
@@ -324,6 +311,33 @@ _purge_remaining_messages(KafkaDestDriver *self)
 
 }
 
+static void
+_update_drain_timer(KafkaDestDriver *self)
+{
+  if (iv_timer_registered(&self->poll_timer))
+    iv_timer_unregister(&self->poll_timer);
+  iv_validate_now();
+  self->poll_timer.expires = iv_now;
+  timespec_add_msec(&self->poll_timer.expires, self->poll_timeout);
+  iv_timer_register(&self->poll_timer);
+}
+
+static void
+_drain_responses(KafkaDestDriver *self)
+{
+  _update_drain_timer(self);
+  gint count = rd_kafka_poll(self->kafka, 0);
+  if (count != 0)
+    {
+      msg_trace("kafka: destination side (driver) rd_kafka_poll() processed some responses",
+                evt_tag_str("topic", self->topic_name),
+                evt_tag_int("count", count),
+                evt_tag_str("driver", self->super.super.super.id),
+                log_pipe_location_tag(&self->super.super.super.super));
+    }
+}
+
+
 static gboolean
 kafka_dd_init(LogPipe *s)
 {
@@ -375,6 +389,14 @@ kafka_dd_init(LogPipe *s)
               evt_tag_str("driver", self->super.super.super.id),
               log_pipe_location_tag(&self->super.super.super.super));
 
+  IV_TIMER_INIT(&self->poll_timer);
+  self->poll_timer.cookie = self;
+  self->poll_timer.handler = (void (*)(void *)) _drain_responses;
+  self->poll_timer.expires = iv_now;
+  self->poll_timer.expires.tv_sec++;
+  self->poll_timer.expires.tv_nsec = 0;
+  iv_timer_register(&self->poll_timer);
+
   return log_threaded_dest_driver_start_workers(&self->super);
 }
 
@@ -403,6 +425,8 @@ kafka_dd_free(LogPipe *d)
     rd_kafka_destroy(self->kafka);
   if (self->topic_name)
     g_free(self->topic_name);
+  if (iv_timer_registered(&self->poll_timer))
+    iv_timer_unregister(&self->poll_timer);
   g_free(self->bootstrap_servers);
   kafka_property_list_free(self->config);
   log_threaded_dest_driver_free(d);
