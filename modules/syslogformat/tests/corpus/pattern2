@@ -1,0 +1,2 @@
+<38>Oct 11 22:14:15 mymachine sudo:   bazsi : TTY=pts/1 ; PWD=/home/bazsi ; USER=root ; COMMAND=/bin/grep sudo /var/log/messages
+

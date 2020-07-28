@@ -14,3 +14,5 @@ add_module(
   SOURCES ${SYSLOGFORMAT_SOURCES}
 )
 
+add_test_subdirectory(tests)
+

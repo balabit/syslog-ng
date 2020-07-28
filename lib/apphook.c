@@ -217,6 +217,7 @@ app_shutdown(void)
   child_manager_deinit();
   g_list_foreach(application_hooks, (GFunc) g_free, NULL);
   g_list_free(application_hooks);
+  application_hooks = NULL;
   dns_caching_thread_deinit();
   dns_caching_global_deinit();
   hostname_global_deinit();

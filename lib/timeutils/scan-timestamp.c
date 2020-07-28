@@ -328,7 +328,7 @@ __parse_usec(const guchar **data, gint *length)
           src++;
           (*length)--;
         }
-      while (isdigit(*src))
+      while (*length > 0 && isdigit(*src))
         {
           src++;
           (*length)--;
@@ -470,7 +470,7 @@ scan_rfc3164_timestamp(const guchar **data, gint *length, WallClockTime *wct)
    * looking at you, skip that as well, so we can reliably detect IPv6
    * addresses as hostnames, which would be using ":" as well. */
 
-  if (*src == ':')
+  if (left > 0 && *src == ':')
     {
       ++src;
       --left;

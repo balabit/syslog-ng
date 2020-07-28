@@ -41,7 +41,6 @@ static const char aix_fwd_string[] = "Message forwarded from ";
 static const char repeat_msg_string[] = "last message repeated";
 static struct
 {
-  gboolean initialized;
   NVHandle is_synced;
   NVHandle cisco_seqid;
   NVHandle raw_message;
@@ -187,7 +186,6 @@ log_msg_parse_cisco_sequence_id(LogMessage *self, const guchar **data, gint *len
   const guchar *src = *data;
   gint left = *length;
 
-
   while (left && *src != ':')
     {
       if (!isdigit(*src))
@@ -195,11 +193,14 @@ log_msg_parse_cisco_sequence_id(LogMessage *self, const guchar **data, gint *len
       src++;
       left--;
     }
+  if (left == 0)
+    return;
   src++;
   left--;
 
   /* if the next char is not space, then we may try to read a date */
 
+  if (left==0) return;
   if (*src != ' ')
     return;
 
@@ -760,8 +761,11 @@ log_msg_parse_legacy(const MsgFormatOptions *parse_options,
     }
 
   log_msg_parse_cisco_sequence_id(self, &src, &left);
+  if (left == 0) goto error;
   log_msg_parse_skip_chars(self, &src, &left, " ", -1);
+  if (left == 0) goto error;
   log_msg_parse_cisco_timestamp_attributes(self, &src, &left, parse_options->flags);
+  if (left == 0) goto error;
 
   cached_g_current_time(&now);
   if (log_msg_parse_date(self, &src, &left, parse_options->flags & ~LP_SYSLOG_PROTOCOL,
@@ -1036,13 +1040,9 @@ syslog_format_handler(const MsgFormatOptions *parse_options,
 void
 syslog_format_init(void)
 {
-  if (!handles.initialized)
-    {
-      handles.is_synced = log_msg_get_value_handle(".SDATA.timeQuality.isSynced");
-      handles.cisco_seqid = log_msg_get_value_handle(".SDATA.meta.sequenceId");
-      handles.raw_message = log_msg_get_value_handle("RAWMSG");
-      handles.initialized = TRUE;
-    }
+  handles.is_synced = log_msg_get_value_handle(".SDATA.timeQuality.isSynced");
+  handles.cisco_seqid = log_msg_get_value_handle(".SDATA.meta.sequenceId");
+  handles.raw_message = log_msg_get_value_handle("RAWMSG");
 
   _init_parse_hostname_invalid_chars();
 }
