@@ -40,7 +40,7 @@ def test_follow_freq_value(config, syslog_ng, follow_freq, expected):
     config.set_raw_config(raw_config)
 
     if expected is True:
-        syslog_ng.start(config)
+        syslog_ng.syntax_check(config)
     else:
         with pytest.raises(Exception):
-            syslog_ng.start(config)
+            syslog_ng.syntax_check(config)
