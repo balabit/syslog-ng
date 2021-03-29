@@ -70,7 +70,8 @@ class SyslogNgCli(object):
             command_short_name="syntax_only", command=["--syntax-only", "--cfgfile={}".format(config_path)],
         )
 
-    def __syntax_check(self):
+    def syntax_check(self, config):
+        config.write_config(self.__instance_paths.get_config_path())
         result = self.__syntax_only()
         if result["exit_code"] != 0:
             logger.error(result["stderr"])
