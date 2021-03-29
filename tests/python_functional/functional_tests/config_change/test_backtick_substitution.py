@@ -20,11 +20,17 @@
 # COPYING for details.
 #
 #############################################################################
+import pytest
 
 
-def test_backtick_substitution(config, syslog_ng):
+@pytest.mark.parametrize(
+    "config_valid,expected", [
+        ("valid", True),
+        ("invalid", False),
+    ],
+)
+def test_backtick_substitution(config, syslog_ng, config_valid, expected):
     raw_config = """
-@define config-type valid
 block root valid()
 {
   log { };
@@ -38,7 +44,11 @@ block root invalid()
 `config-type`();
 
 """
-    raw_config = "@version: {}\n".format(config.get_version()) + raw_config
+    raw_config = "@version: {}\n@define config-type {}\n".format(config.get_version(), config_valid) + raw_config
     config.set_raw_config(raw_config)
 
-    syslog_ng.start(config)
+    if expected is True:
+        syslog_ng.start(config)
+    else:
+        with pytest.raises(Exception):
+            syslog_ng.start(config)
