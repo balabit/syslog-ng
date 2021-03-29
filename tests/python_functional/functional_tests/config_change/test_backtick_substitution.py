@@ -24,10 +24,19 @@
 
 def test_backtick_substitution(config, syslog_ng):
     raw_config = """
-@define disable none
-options {
-    mark-mode(`disable`);
+@define config-type valid
+block root valid()
+{
+  log { };
 };
+
+block root invalid()
+{
+  this should fail!!
+};
+
+`config-type`();
+
 """
     raw_config = "@version: {}\n".format(config.get_version()) + raw_config
     config.set_raw_config(raw_config)
