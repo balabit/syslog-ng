@@ -33,7 +33,7 @@ def test_backtick_substitution(config, syslog_ng, config_valid, expected):
     raw_config = """
 block root valid()
 {
-  log { };
+  log { source { example-msg-generator(); }; };
 };
 
 block root invalid()

@@ -121,6 +121,7 @@ ParameterizedTest(PipeParameter *test_data, cfg_tree, test_pipe_init)
   AlmightyAlwaysPipe *pipe;
 
   cfg_tree_init_instance(&tree, NULL);
+  tree.check_zero_source_count = FALSE;
 
   pipe = create_and_attach_almighty_pipe(&tree, test_data->always_pipe_value);
 
@@ -142,6 +143,7 @@ Test(cfg_tree, test_pipe_init_multi_success)
   CfgTree tree;
 
   cfg_tree_init_instance (&tree, NULL);
+  tree.check_zero_source_count = FALSE;
 
   create_and_attach_almighty_pipe (&tree, TRUE);
   create_and_attach_almighty_pipe (&tree, TRUE);
@@ -161,6 +163,7 @@ Test(cfg_tree, test_pipe_init_multi_with_bad_node)
   CfgTree tree;
 
   cfg_tree_init_instance (&tree, NULL);
+  tree.check_zero_source_count = FALSE;
 
   pipe1 = create_and_attach_almighty_pipe (&tree, TRUE);
   pipe2 = create_and_attach_almighty_pipe (&tree, FALSE);

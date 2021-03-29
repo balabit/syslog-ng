@@ -36,7 +36,7 @@ import pytest
     ],
 )
 def test_follow_freq_value(config, syslog_ng, follow_freq, expected):
-    raw_config = '@version: {}\nsource s_file {{ file("input.log" follow-freq({})); }};'.format(config.get_version(), follow_freq)
+    raw_config = '@version: {}\nsource s_file {{ file("input.log" follow-freq({})); }}; log {{ source(s_file); }};'.format(config.get_version(), follow_freq)
     config.set_raw_config(raw_config)
 
     if expected is True:

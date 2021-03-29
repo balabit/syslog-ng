@@ -1334,6 +1334,50 @@ cfg_tree_check_inline_template(CfgTree *self, const gchar *template_or_name, GEr
 }
 
 gboolean
+_count_sources(LogExprNode *node, gpointer user_data)
+{
+  gint *counter = (gint *)user_data;
+
+  if (node->content == ENC_SOURCE)
+    ++(*counter);
+
+  return TRUE;
+}
+
+static void
+cfg_tree_foreach(LogExprNode *node, gboolean (*func)(LogExprNode *, gpointer user_data), gpointer user_data)
+{
+  g_assert(func != NULL);
+  g_assert(node != NULL);
+
+  if (!func(node, user_data))
+    return;
+
+  if (node->children)
+    cfg_tree_foreach(node->children, func, user_data);
+
+  if (node->next)
+    cfg_tree_foreach(node->next, func, user_data);
+}
+
+static gboolean
+cfg_tree_check_empty_pipelines(CfgTree *self)
+{
+  gint source_counter = 0;
+
+  for (gint i = 0; i < self->rules->len; i++)
+    {
+      LogExprNode *rule = (LogExprNode *) g_ptr_array_index(self->rules, i);
+
+      cfg_tree_foreach(rule, _count_sources, &source_counter);
+      if (source_counter > 0)
+        return TRUE;
+    }
+
+  return (source_counter > 0);
+}
+
+gboolean
 cfg_tree_compile(CfgTree *self)
 {
   gint i;
@@ -1359,6 +1403,13 @@ cfg_tree_compile(CfgTree *self)
           return FALSE;
         }
     }
+
+  if (self->check_zero_source_count && !cfg_tree_check_empty_pipelines(self))
+    {
+      msg_error("There are no source configured in any of the logpaths, there is nothing for syslog-ng to do");
+      return FALSE;
+    }
+
   self->compiled = TRUE;
   return TRUE;
 }
@@ -1474,6 +1525,7 @@ cfg_tree_init_instance(CfgTree *self, GlobalConfig *cfg)
   self->templates = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, (GDestroyNotify) log_template_unref);
   self->rules = g_ptr_array_new();
   self->cfg = cfg;
+  self->check_zero_source_count = TRUE;
 }
 
 void
