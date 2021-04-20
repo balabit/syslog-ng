@@ -1,0 +1,1 @@
+allow syslogd_t self:capability { net_admin };

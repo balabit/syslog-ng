@@ -1,0 +1,23 @@
+require {
+        type syslogd_t, shell_exec_t, bin_t, kmsg_device_t, anon_inodefs_t, tmpfs_t;
+        class file { ioctl read write getattr lock execute execute_no_trans open create unlink };
+        class dir { add_name remove_name };
+        class chr_file { open read };
+        class lnk_file { read getattr };
+        class process { fork sigchld sigkill sigstop signull signal getsched setsched setpgid getcap setcap setrlimit };
+}
+
+allow syslogd_t self:capability { net_admin };
+
+allow syslogd_t shell_exec_t:file { read execute getattr execute_no_trans open };
+allow syslogd_t bin_t:file { ioctl read getattr lock execute execute_no_trans open };
+allow syslogd_t bin_t:lnk_file { read getattr };
+
+allow syslogd_t kmsg_device_t:chr_file { open read };
+allow syslogd_t anon_inodefs_t:file { read write };
+
+allow syslogd_t tmpfs_t:dir { add_name remove_name write };
+allow syslogd_t tmpfs_t:file { create unlink open read write };
+
+allow syslogd_t syslogd_t:process { fork sigchld sigkill sigstop signull signal getsched setsched setpgid getcap setcap setrlimit };
+

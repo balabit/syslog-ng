@@ -1,0 +1,13 @@
+require {
+        type kmsg_device_t, tmpfs_t;
+        class chr_file { open read };
+        class dir { add_name remove_name };
+        class file { create unlink open read write };
+}
+
+allow syslogd_t self:capability { net_admin };
+
+allow syslogd_t kmsg_device_t:chr_file { open read };
+
+allow syslogd_t tmpfs_t:dir { add_name remove_name write };
+allow syslogd_t tmpfs_t:file { create unlink open read write };

@@ -1,0 +1,2 @@
+policy_module(syslog_ng, 1.0.10)
+

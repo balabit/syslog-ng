@@ -4,3 +4,4 @@ $PATH$/var/syslog-ng.*		--	gen_context(system_u:object_r:syslogd_var_lib_t,s0)
 $PATH$/libexec/syslog-ng	--	gen_context(system_u:object_r:syslogd_exec_t,s0)
 $PATH$/libexec/syslog-ng-wrapper.sh	--	gen_context(system_u:object_r:syslogd_exec_t,s0)
 $PATH$/share/include/scl/system/generate-system-source.sh	--	gen_context(system_u:object_r:bin_t,s0)
+

@@ -60,19 +60,22 @@ EXTRA_DIST += \
 	contrib/freebsd-packaging/syslog-ng.conf.example \
 	contrib/openbsd-packaging/syslog-ng.conf \
 	\
+	contrib/selinux/core/root_unsafe/syslog_ng.el6.fc.in \
+	contrib/selinux/core/root_unsafe/syslog_ng.el78.fc.in \
+	contrib/selinux/core/root_unsafe/syslog_ng.el5.fc.in \
+	contrib/selinux/core/root_safe/syslog_ng.el6.fc.in \
+	contrib/selinux/core/root_safe/syslog_ng.el78.fc.in \
+	contrib/selinux/core/root_safe/syslog_ng.el5.fc.in \
+	contrib/selinux/core/syslog_ng.el6.0to4.te.in \
+	contrib/selinux/core/syslog_ng.el7.te.in \
+	contrib/selinux/core/syslog_ng.el8.te.in \
+	contrib/selinux/core/syslog_ng.module.version \
+	contrib/selinux/core/syslog_ng.el6.5up.te.in \
+	contrib/selinux/core/syslog_ng.el5.te.in \
 	contrib/selinux/README \
+	contrib/selinux/include/common.sh.inc \
 	contrib/selinux/labels.txt \
 	contrib/selinux/syslog_ng.sh \
-	contrib/selinux/src/syslog_ng.el67.te.in \
-	contrib/selinux/src/syslog_ng.module.version \
-	contrib/selinux/src/root_unsafe/syslog_ng.el7.fc.in \
-	contrib/selinux/src/root_unsafe/syslog_ng.el6.fc.in \
-	contrib/selinux/src/root_unsafe/syslog_ng.el5.fc.in \
-	contrib/selinux/src/root_safe/syslog_ng.el7.fc.in \
-	contrib/selinux/src/root_safe/syslog_ng.el6.fc.in \
-	contrib/selinux/src/root_safe/syslog_ng.el5.fc.in \
-	contrib/selinux/src/syslog_ng.el5.te.in \
-	contrib/selinux/src/syslog_ng.el6.0to4.te.in \
 	\
 	contrib/apparmor/opt.syslog-ng.sbin.syslog-ng \
 	\
