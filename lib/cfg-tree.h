@@ -168,6 +168,7 @@ typedef struct _CfgTree
   GPtrArray *rules;
   GHashTable *templates;
   gboolean compiled;
+  gboolean check_zero_source_count;
 } CfgTree;
 
 gboolean cfg_tree_add_object(CfgTree *self, LogExprNode *rule);

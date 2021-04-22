@@ -70,7 +70,8 @@ class SyslogNgCli(object):
             command_short_name="syntax_only", command=["--syntax-only", "--cfgfile={}".format(config_path)],
         )
 
-    def __syntax_check(self):
+    def syntax_check(self, config):
+        config.write_config(self.__instance_paths.get_config_path())
         result = self.__syntax_only()
         if result["exit_code"] != 0:
             logger.error(result["stderr"])
@@ -110,7 +111,6 @@ class SyslogNgCli(object):
 
         config.write_config(self.__instance_paths.get_config_path())
 
-        self.__syntax_check()
         self.__start_syslog_ng()
 
         logger.info("syslog-ng process has been started with PID: {}\n".format(self.__process.pid))

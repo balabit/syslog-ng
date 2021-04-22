@@ -531,6 +531,7 @@ cfg_new_snippet(void)
 
   self->use_plugin_discovery = FALSE;
   self->enable_forced_modules = FALSE;
+  self->tree.check_zero_source_count = FALSE;
   return self;
 }
 
