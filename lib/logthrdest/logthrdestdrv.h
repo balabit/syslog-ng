@@ -146,6 +146,7 @@ struct _LogThreadedDestDriver
    * increased in parallel by the multiple threads. */
 
   gint32 shared_seq_num;
+  gchar *persist_name_for_assertion;
 
   WorkerOptions worker_options;
   const gchar *(*format_stats_instance)(LogThreadedDestDriver *s);
@@ -227,7 +228,7 @@ void log_threaded_dest_worker_free_method(LogThreadedDestWorker *self);
 void log_threaded_dest_worker_free(LogThreadedDestWorker *self);
 
 gboolean log_threaded_dest_driver_deinit_method(LogPipe *s);
-gboolean log_threaded_dest_driver_init_method(LogPipe *s);
+gboolean log_threaded_dest_driver_init_method(LogPipe *s, const gchar *persist_name);
 gboolean log_threaded_dest_driver_start_workers(LogPipe *s);
 
 void log_threaded_dest_driver_init_instance(LogThreadedDestDriver *self, GlobalConfig *cfg);

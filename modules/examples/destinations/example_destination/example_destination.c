@@ -83,7 +83,7 @@ _dd_init(LogPipe *d)
   if (!self->filename->len)
     g_string_assign(self->filename, "/tmp/example-destination-output.txt");
 
-  if (!log_threaded_dest_driver_init_method(d))
+  if (!log_threaded_dest_driver_init_method(d, _format_persist_name(d)))
     return FALSE;
 
   return TRUE;

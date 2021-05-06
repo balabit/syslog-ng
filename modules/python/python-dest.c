@@ -568,7 +568,7 @@ python_dd_init(LogPipe *d)
     goto fail;
   PyGILState_Release(gstate);
 
-  if (!log_threaded_dest_driver_init_method(d))
+  if (!log_threaded_dest_driver_init_method(d, python_dd_format_persist_name(d)))
     return FALSE;
 
   gstate = PyGILState_Ensure();

@@ -539,7 +539,7 @@ kafka_dd_init(LogPipe *s)
   if (!_init_topic_name(self))
     return FALSE;
 
-  if (!log_threaded_dest_driver_init_method(s))
+  if (!log_threaded_dest_driver_init_method(s, _format_persist_name(s)))
     return FALSE;
 
   if (self->message == NULL)

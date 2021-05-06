@@ -357,7 +357,7 @@ http_dd_init(LogPipe *s)
   /* we need to set up url before we call the inherited init method, so our stats key is correct */
   self->url = self->load_balancer->targets[0].url;
 
-  if (!log_threaded_dest_driver_init_method(s))
+  if (!log_threaded_dest_driver_init_method(s, _format_persist_name(s)))
     return FALSE;
 
   log_template_options_init(&self->template_options, cfg);

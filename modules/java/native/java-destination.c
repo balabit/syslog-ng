@@ -130,6 +130,21 @@ java_dd_set_template_string(LogDriver *s, const gchar *template_string)
   self->template_string = g_strdup(template_string);
 }
 
+static const gchar *
+java_dd_format_persist_name(const LogPipe *s)
+{
+  const JavaDestDriver *self = (const JavaDestDriver *)s;
+  static gchar persist_name[1024];
+
+  if (s->persist_name)
+    g_snprintf(persist_name, sizeof(persist_name), "java_dst.%s", s->persist_name);
+  else
+    g_snprintf(persist_name, sizeof(persist_name), "java_dst(%s)",
+               java_destination_proxy_get_name_by_uniq_options(self->proxy));
+
+  return persist_name;
+}
+
 gboolean
 java_dd_init(LogPipe *s)
 {
@@ -157,7 +172,7 @@ java_dd_init(LogPipe *s)
   if (!java_destination_proxy_init(self->proxy))
     return FALSE;
 
-  if (!log_threaded_dest_driver_init_method(s))
+  if (!log_threaded_dest_driver_init_method(s, java_dd_format_persist_name(s)))
     return FALSE;
 
   return TRUE;
@@ -232,21 +247,6 @@ java_worker_thread_deinit(LogThreadedDestDriver *d)
 {
   java_dd_close(d);
   java_machine_detach_thread();
-}
-
-static const gchar *
-java_dd_format_persist_name(const LogPipe *s)
-{
-  const JavaDestDriver *self = (const JavaDestDriver *)s;
-  static gchar persist_name[1024];
-
-  if (s->persist_name)
-    g_snprintf(persist_name, sizeof(persist_name), "java_dst.%s", s->persist_name);
-  else
-    g_snprintf(persist_name, sizeof(persist_name), "java_dst(%s)",
-               java_destination_proxy_get_name_by_uniq_options(self->proxy));
-
-  return persist_name;
 }
 
 static const gchar *

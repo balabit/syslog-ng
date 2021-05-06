@@ -107,19 +107,15 @@ log_threaded_dest_worker_rewind_messages(LogThreadedDestWorker *self, gint batch
 static gchar *
 _format_queue_persist_name(LogThreadedDestWorker *self)
 {
-  LogPipe *owner = &self->owner->super.super.super;
-
   if (self->worker_index == 0)
     {
       /* the first worker uses the legacy persist name, e.g.  to be able to
        * recover the queue previously used.  */
-      return g_strdup(log_pipe_get_persist_name(owner));
+      return g_strdup(log_pipe_get_persist_name((LogPipe *)self->owner));
     }
   else
     {
-      return g_strdup_printf("%s.%d.queue",
-                             log_pipe_get_persist_name(owner),
-                             self->worker_index);
+      return g_strdup_printf("%s.%d.queue", log_pipe_get_persist_name((LogPipe *)self->owner), self->worker_index);
     }
 }
 
@@ -772,9 +768,9 @@ ok:
 static gboolean
 _acquire_worker_queue(LogThreadedDestWorker *self)
 {
-  gchar *persist_name = _format_queue_persist_name(self);
-  self->queue = log_dest_driver_acquire_queue(&self->owner->super, persist_name);
-  g_free(persist_name);
+  gchar *queue_persist_name = _format_queue_persist_name(self);
+  self->queue = log_dest_driver_acquire_queue(&self->owner->super, queue_persist_name);
+  g_free(queue_persist_name);
 
   if (!self->queue)
     return FALSE;
@@ -1031,12 +1027,10 @@ _unregister_stats(LogThreadedDestDriver *self)
 static gchar *
 _format_seqnum_persist_name(LogThreadedDestDriver *self)
 {
-  static gchar persist_name[256];
+  static gchar seqnum_persist_name[256];
 
-  g_snprintf(persist_name, sizeof(persist_name), "%s.seqnum",
-             self->super.super.super.generate_persist_name((const LogPipe *)self));
-
-  return persist_name;
+  g_snprintf(seqnum_persist_name, sizeof(seqnum_persist_name), "%s.seqnum", log_pipe_get_persist_name((LogPipe *)self));
+  return seqnum_persist_name;
 }
 
 static gboolean
@@ -1058,11 +1052,22 @@ _create_workers(LogThreadedDestDriver *self)
   return TRUE;
 }
 
+static void
+_assert_on_persist_name(LogThreadedDestDriver *self)
+{
+  // Make sure that generate_persist_name virtual function still returns
+  // the same value as provided during the init phase. Because several
+  // functionality of the LogThreadedDestDriver depends on it.
+  g_assert_cmpstr(self->persist_name_for_assertion, ==, log_pipe_get_persist_name((LogPipe *)self));
+}
+
 gboolean
-log_threaded_dest_driver_init_method(LogPipe *s)
+log_threaded_dest_driver_init_method(LogPipe *s, const gchar *persist_name)
 {
   LogThreadedDestDriver *self = (LogThreadedDestDriver *)s;
   GlobalConfig *cfg = log_pipe_get_config(s);
+
+  self->persist_name_for_assertion = g_strdup(persist_name);
 
   if (!log_dest_driver_init_method(&self->super.super.super))
     return FALSE;
@@ -1085,6 +1090,14 @@ log_threaded_dest_driver_init_method(LogPipe *s)
   return TRUE;
 }
 
+gboolean
+_log_threaded_dest_driver_init_method(LogPipe *s)
+{
+  const gchar *persist_name = log_pipe_get_persist_name(s);
+  return log_threaded_dest_driver_init_method(s, persist_name);
+}
+
+
 /* This method is only used when a LogThreadedDestDriver is directly used
  * without overriding its on_config_inited method.  If there's an overridden
  * method, the caller is responsible for explicitly calling _start_workers() at
@@ -1093,6 +1106,8 @@ gboolean
 log_threaded_dest_driver_start_workers(LogPipe *s)
 {
   LogThreadedDestDriver *self = (LogThreadedDestDriver *) s;
+
+  _assert_on_persist_name(self);
 
   for (gint worker_index = 0; worker_index < self->num_workers; worker_index++)
     {
@@ -1107,12 +1122,16 @@ log_threaded_dest_driver_deinit_method(LogPipe *s)
 {
   LogThreadedDestDriver *self = (LogThreadedDestDriver *)s;
 
+  _assert_on_persist_name(self);
+
   /* NOTE: workers are shut down by the time we get here, through the
    * request_exit mechanism of main loop worker threads */
 
   cfg_persist_config_add(log_pipe_get_config(s),
                          _format_seqnum_persist_name(self),
                          GINT_TO_POINTER(self->shared_seq_num), NULL, FALSE);
+
+  g_free(self->persist_name_for_assertion);
 
   _unregister_stats(self);
 
@@ -1144,7 +1163,7 @@ log_threaded_dest_driver_init_instance(LogThreadedDestDriver *self, GlobalConfig
 
   self->worker_options.is_output_thread = TRUE;
 
-  self->super.super.super.init = log_threaded_dest_driver_init_method;
+  self->super.super.super.init = _log_threaded_dest_driver_init_method;
   self->super.super.super.deinit = log_threaded_dest_driver_deinit_method;
   self->super.super.super.queue = log_threaded_dest_driver_queue;
   self->super.super.super.free_fn = log_threaded_dest_driver_free;

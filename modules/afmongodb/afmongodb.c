@@ -509,7 +509,7 @@ _init(LogPipe *s)
   if (!afmongodb_dd_private_uri_init(&self->super.super.super))
     return FALSE;
 
-  if (!log_threaded_dest_driver_init_method(s))
+  if (!log_threaded_dest_driver_init_method(s, _format_persist_name(s)))
     return FALSE;
 
   return TRUE;

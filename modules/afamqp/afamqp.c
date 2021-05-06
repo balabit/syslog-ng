@@ -725,7 +725,7 @@ afamqp_dd_init(LogPipe *s)
       return FALSE;
     }
 
-  if (!log_threaded_dest_driver_init_method(s))
+  if (!log_threaded_dest_driver_init_method(s, afamqp_dd_format_persist_name(s)))
     return FALSE;
 
   log_template_options_init(&self->template_options, cfg);

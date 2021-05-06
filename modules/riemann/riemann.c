@@ -263,7 +263,7 @@ riemann_dd_init(LogPipe *s)
   if (self->port == -1)
     self->port = 5555;
 
-  if (!log_threaded_dest_driver_init_method(s))
+  if (!log_threaded_dest_driver_init_method(s, riemann_dd_format_persist_name(s)))
     return FALSE;
 
   if (!self->fields.host)
