@@ -2,8 +2,8 @@
 #find -name '*.py'|awk '{ print "\ttests/python_functional/src/"substr($0,3); }'|sort
 EXTRA_DIST += \
 	tests/python_functional/src/common/blocking.py \
-	tests/python_functional/src/common/__init__.py \
 	tests/python_functional/src/common/file.py \
+	tests/python_functional/src/common/__init__.py \
 	tests/python_functional/src/common/network_operations.py \
 	tests/python_functional/src/common/operations.py \
 	tests/python_functional/src/common/pytest_operations.py \
@@ -27,6 +27,8 @@ EXTRA_DIST += \
 	tests/python_functional/src/helpers/__init__.py \
 	tests/python_functional/src/helpers/loggen/__init__.py \
 	tests/python_functional/src/helpers/loggen/loggen.py \
+	tests/python_functional/src/helpers/netcat/__init__.py \
+	tests/python_functional/src/helpers/netcat/netcat.py \
 	tests/python_functional/src/helpers/secure_logging/conftest.py \
 	tests/python_functional/src/helpers/secure_logging/__init__.py \
 	tests/python_functional/src/helpers/snmptrapd/conftest.py \
@@ -43,6 +45,7 @@ EXTRA_DIST += \
 	tests/python_functional/src/syslog_ng_config/statements/destinations/example_destination.py \
 	tests/python_functional/src/syslog_ng_config/statements/destinations/file_destination.py \
 	tests/python_functional/src/syslog_ng_config/statements/destinations/__init__.py \
+	tests/python_functional/src/syslog_ng_config/statements/destinations/network_destination.py \
 	tests/python_functional/src/syslog_ng_config/statements/destinations/snmp_destination.py \
 	tests/python_functional/src/syslog_ng_config/statements/filters/filter.py \
 	tests/python_functional/src/syslog_ng_config/statements/filters/__init__.py \

@@ -28,6 +28,7 @@ from src.syslog_ng_config.renderer import ConfigRenderer
 from src.syslog_ng_config.statement_group import StatementGroup
 from src.syslog_ng_config.statements.destinations.example_destination import ExampleDestination
 from src.syslog_ng_config.statements.destinations.file_destination import FileDestination
+from src.syslog_ng_config.statements.destinations.network_destination import NetworkDestination
 from src.syslog_ng_config.statements.destinations.snmp_destination import SnmpDestination
 from src.syslog_ng_config.statements.filters.filter import Filter
 from src.syslog_ng_config.statements.logpath.logpath import LogPath
@@ -121,6 +122,9 @@ class SyslogNgConfig(object):
 
     def create_snmp_destination(self, **options):
         return SnmpDestination(**options)
+
+    def create_network_destination(self, **options):
+        return NetworkDestination(**options)
 
     def create_db_parser(self, config, **options):
         return DBParser(config, **options)

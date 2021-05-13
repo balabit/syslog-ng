@@ -20,6 +20,7 @@
 # COPYING for details.
 #
 #############################################################################
+import atexit
 import logging
 import shutil
 
@@ -59,7 +60,9 @@ class File(object):
         self.path = Path(file_path)
         self.__opened_file = None
 
-    def __del__(self):
+        atexit.register(self.deinit)
+
+    def deinit(self):
         if self.is_opened():
             self.close()
 
@@ -101,8 +104,18 @@ class File(object):
         self.__opened_file.flush()
 
     def wait_for_lines(self, lines, timeout=DEFAULT_TIMEOUT):
+        def read_whole_line(f, previous_data=None):
+            if previous_data:
+                buffer = previous_data
+            else:
+                buffer = ""
+            buffer += f.readline()
+            if buffer and buffer[-1] != "\n":
+                return read_whole_line(f, previous_data=buffer)
+            return buffer
+
         def find_lines_in_file(lines_to_find, lines_found, f):
-            line_read = f.readline()
+            line_read = read_whole_line(f)
             if not line_read and lines_to_find:
                 return False
             for line_to_find in lines_to_find:
