@@ -771,6 +771,7 @@ afsql_dd_build_insert_command(AFSqlDestDriver *self, LogMessage *msg, GString *t
 {
   GString *insert_command = g_string_sized_new(256);
   GString *value = g_string_sized_new(512);
+  gboolean fallback = self->template_options.on_error & ON_ERROR_FALLBACK_TO_STRING;
   gint i, j;
 
   g_string_printf(insert_command, "INSERT INTO %s (", table->str);
@@ -791,11 +792,12 @@ afsql_dd_build_insert_command(AFSqlDestDriver *self, LogMessage *msg, GString *t
     }
 
   g_string_append(insert_command, ") VALUES (");
+  gboolean need_drop = FALSE;
 
   for (i = 0; i < self->fields_len; i++)
     {
-      gchar *quoted;
-
+      gchar *quoted = NULL;
+      gchar *escaped = NULL;
       if ((self->fields[i].flags & AFSQL_FF_DEFAULT) == 0 && self->fields[i].value != NULL)
         {
           LogTemplateEvalOptions options = {&self->template_options, LTZ_SEND, self->super.worker.instance.seq_num, NULL};
@@ -806,11 +808,84 @@ afsql_dd_build_insert_command(AFSqlDestDriver *self, LogMessage *msg, GString *t
             }
           else
             {
-              dbi_conn_quote_string_copy(self->dbi_ctx, value->str, &quoted);
+              TypeHint type = self->fields[i].value->type_hint;
+              switch(type)
+                {
+                case TYPE_HINT_INT32:
+                case TYPE_HINT_INT64:
+                {
+                  gint64 k;
+                  if (type_cast_to_int64(value->str, &k, NULL))
+                    {
+                      dbi_conn_escape_string_copy(self->dbi_ctx, value->str, &escaped);
+                      g_string_append_printf(insert_command, "%ld", k);
+                    }
+                  else
+                    {
+                      need_drop = type_cast_drop_helper(self->template_options.on_error,
+                                                        value->str, "int");
+
+                      if (fallback)
+                        {
+                          dbi_conn_quote_string_copy(self->dbi_ctx, value->str, &quoted);
+                        }
+                    }
+                  break;
+                }
+                case TYPE_HINT_DOUBLE:
+                {
+                  gdouble d;
+                  if (type_cast_to_double(value->str, &d, NULL))
+                    {
+                      dbi_conn_escape_string_copy(self->dbi_ctx, value->str, &escaped);
+                      g_string_append_printf(insert_command, "%f", d);
+                    }
+                  else
+                    {
+                      need_drop = type_cast_drop_helper(self->template_options.on_error,
+                                                        value->str, "double");
+                      if (fallback)
+                        {
+                          dbi_conn_quote_string_copy(self->dbi_ctx, value->str, &quoted);
+                        }
+                    }
+                  break;
+                }
+                case TYPE_HINT_BOOLEAN:
+                {
+                  gboolean b;
+                  if (type_cast_to_boolean(value->str, &b, NULL))
+                    {
+                      if (b)
+                        {
+                          dbi_conn_escape_string_copy(self->dbi_ctx, "TRUE", &escaped);
+                        }
+                      else
+                        {
+                          dbi_conn_escape_string_copy(self->dbi_ctx, "FALSE", &escaped);
+                        }
+                    }
+                  else
+                    {
+                      need_drop = type_cast_drop_helper(self->template_options.on_error,
+                                                        value->str, "boolean");
+                      if (fallback)
+                        {
+                          dbi_conn_quote_string_copy(self->dbi_ctx, value->str, &quoted);
+                        }
+                    }
+                }
+                default:
+                  dbi_conn_quote_string_copy(self->dbi_ctx, value->str, &quoted);
+                }
               if (quoted)
                 {
                   g_string_append(insert_command, quoted);
                   free(quoted);
+                }
+              else if (escaped)
+                {
+                  free(escaped);
                 }
               else
                 {
@@ -829,7 +904,11 @@ afsql_dd_build_insert_command(AFSqlDestDriver *self, LogMessage *msg, GString *t
   g_string_append(insert_command, ")");
 
   g_string_free(value, TRUE);
-
+  if (need_drop)
+    {
+      free(insert_command);
+      return NULL;
+    }
   return insert_command;
 }
 
@@ -909,9 +988,17 @@ afsql_dd_run_insert_query(AFSqlDestDriver *self, GString *table, LogMessage *msg
   GString *insert_command;
 
   insert_command = afsql_dd_build_insert_command(self, msg, table);
-  gboolean success = afsql_dd_run_query(self, insert_command->str, FALSE, NULL);
-  g_string_free(insert_command, TRUE);
-  return success;
+  if(insert_command)
+    {
+      gboolean success = afsql_dd_run_query(self, insert_command->str, FALSE, NULL);
+      g_string_free(insert_command, TRUE);
+      return success;
+    }
+  else
+    {
+      msg_error("INSERT statement dropped as drop is enabled and value isn't okay");
+    }
+  return FALSE;
 }
 
 /**
@@ -1012,7 +1099,6 @@ _update_legacy_persist_name_if_exists(AFSqlDestDriver *self)
 static gboolean
 _init_fields_from_columns_and_values(AFSqlDestDriver *self)
 {
-  GlobalConfig *cfg = log_pipe_get_config(&self->super.super.super.super);
   GList *col, *value;
   gint len_cols, len_values;
   gint i;
@@ -1058,23 +1144,14 @@ _init_fields_from_columns_and_values(AFSqlDestDriver *self)
                     evt_tag_str("column", self->fields[i].name));
           return FALSE;
         }
-
-      if (GPOINTER_TO_UINT(value->data) > 4096)
+      if (value->data == AFSQL_COLUMN_DEFAULT)
         {
-          self->fields[i].value = log_template_new(cfg, NULL);
-          log_template_compile(self->fields[i].value, (gchar *) value->data, NULL);
+          self->fields[i].flags |= AFSQL_FF_DEFAULT;
         }
       else
         {
-          switch (GPOINTER_TO_UINT(value->data))
-            {
-            case AFSQL_COLUMN_DEFAULT:
-              self->fields[i].flags |= AFSQL_FF_DEFAULT;
-              break;
-            default:
-              g_assert_not_reached();
-              break;
-            }
+          log_template_unref(self->fields[i].value);
+          self->fields[i].value = log_template_ref(value->data);
         }
     }
   return TRUE;
@@ -1174,7 +1251,7 @@ afsql_dd_free(LogPipe *s)
     g_free(self->null_value);
   string_list_free(self->columns);
   string_list_free(self->indexes);
-  string_list_free(self->values);
+  g_list_free_full(self->values, (GDestroyNotify)log_template_unref);
   log_template_unref(self->table);
   g_hash_table_destroy(self->syslogng_conform_tables);
   g_hash_table_destroy(self->dbd_options);

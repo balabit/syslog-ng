@@ -30,10 +30,7 @@
 
 #include <dbi.h>
 
-enum
-{
-  AFSQL_COLUMN_DEFAULT = 1,
-};
+#define AFSQL_COLUMN_DEFAULT GUINT_TO_POINTER(1)
 
 /* field flags */
 enum
