@@ -409,7 +409,7 @@ Test(log_message, test_sdata_sanitization)
 
   msg = log_msg_new_empty();
   log_msg_set_value_by_name(msg, ".SDATA.fo@o[0].bar", "value", -1);
-  assert_sdata_value_equals(msg, "[fo@o%5B0%5D bar=\"value\"]");
+  assert_sdata_value_equals(msg, "[fo o%5B0%5D.bar=\"value\"]");
   log_msg_unref(msg);
 }
 

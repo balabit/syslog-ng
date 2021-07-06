@@ -917,6 +917,41 @@ log_msg_sdata_append_escaped(GString *result, const gchar *sstr, gssize len)
     }
 }
 
+static const gchar *
+find_sd_id_in_key(gint sd_id_len, const gchar *sdata_elem, const gchar *sdata_name,
+                  gint sdata_name_len)
+{
+  if (sd_id_len)
+    {
+      const gchar *sd_id_sep = sdata_elem + sd_id_len;
+      if (sd_id_sep - sdata_name == sdata_name_len)
+        {
+          /* Standalone sdata e.g. [[UserData.updatelist@18372.4]] */
+          sd_id_sep = NULL;
+        }
+      else
+        {
+          g_assert((sd_id_sep - sdata_name < sdata_name_len) && *sd_id_sep == '.');
+        }
+
+      return sd_id_sep;
+    }
+
+  /* The SD-ID has two format, one with enterpriseId:
+   * SD-ID : <key>@<enterprise-id>[.<sub-id>]*.<sd-name> = <sd-value>
+   * Both <enterprise-id> and <sub-id> must be a number.
+   */
+  const gchar *at = memchr(sdata_name + logmsg_sd_prefix_len, '@', sdata_name_len - logmsg_sd_prefix_len);
+  if (at)
+    {
+      const gint entreprise_id_len = strspn(at + 1, ".1234567890");
+      return at + entreprise_id_len;
+    }
+
+
+  return memrchr(sdata_elem, '.', sdata_name_len - 7);
+}
+
 void
 log_msg_append_format_sdata(const LogMessage *self, GString *result,  guint32 seq_num)
 {
@@ -934,12 +969,7 @@ log_msg_append_format_sdata(const LogMessage *self, GString *result,  guint32 se
 
   seqid = log_msg_get_value(self, meta_seqid, &seqid_length);
   APPEND_ZERO(seqid, seqid, seqid_length);
-  if (seqid[0])
-    /* Message stores sequenceId */
-    has_seq_num = TRUE;
-  else
-    /* Message hasn't sequenceId */
-    has_seq_num = FALSE;
+  has_seq_num = !!seqid[0];
 
   for (i = 0; i < self->num_sdata; i++)
     {
@@ -962,30 +992,24 @@ log_msg_append_format_sdata(const LogMessage *self, GString *result,  guint32 se
       sdata_elem = sdata_name + 7;
       sd_id_len = (handle_flags >> 8);
 
-      if (sd_id_len)
-        {
-          dot = sdata_elem + sd_id_len;
-          if (dot - sdata_name != sdata_name_len)
-            {
-              g_assert((dot - sdata_name < sdata_name_len) && *dot == '.');
-            }
-          else
-            {
-              /* Standalone sdata e.g. [[UserData.updatelist@18372.4]] */
-              dot = NULL;
-            }
-        }
-      else
-        {
-          dot = memrchr(sdata_elem, '.', sdata_name_len - 7);
-        }
+      dot = find_sd_id_in_key(sd_id_len, sdata_elem, sdata_name, sdata_name_len);
 
       if (G_LIKELY(dot))
         {
-          sdata_elem_len = dot - sdata_elem;
+          if (*dot == '.' || *dot == '@')
+            {
+              sdata_elem_len = dot - sdata_elem;
 
-          sdata_param = dot + 1;
-          sdata_param_len = sdata_name_len - (dot + 1 - sdata_name);
+              sdata_param = dot + 1;
+              sdata_param_len = sdata_name_len - (dot + 1 - sdata_name);
+            }
+          else
+            {
+              sdata_elem_len = dot + 1 - sdata_elem;
+
+              sdata_param = dot + 1;
+              sdata_param_len = sdata_name_len - (dot + 1 - sdata_name);
+            }
         }
       else
         {

@@ -12,7 +12,8 @@ tests_unit_TESTS			= \
 	tests/unit/test_zone		   \
 	tests/unit/test_pathutils	   \
 	tests/unit/test_logwriter	\
-	tests/unit/test_thread_wakeup
+	tests/unit/test_thread_wakeup	\
+	tests/unit/test_format_sdata
 
 check_PROGRAMS				+= \
 	${tests_unit_TESTS}
@@ -66,3 +67,6 @@ tests_unit_test_pathutils_LDADD	= \
 
 tests_unit_test_thread_wakeup_CFLAGS	= $(TEST_CFLAGS)
 tests_unit_test_thread_wakeup_LDADD	= $(TEST_LDADD)
+
+tests_unit_test_format_sdata_CFLAGS	= $(TEST_CFLAGS)
+tests_unit_test_format_sdata_LDADD	= $(TEST_LDADD)
