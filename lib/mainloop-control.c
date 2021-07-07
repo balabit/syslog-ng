@@ -31,6 +31,7 @@
 #include "secret-storage/secret-storage.h"
 #include "cfg-walker.h"
 #include "logpipe.h"
+#include "afinter.h"
 
 #include <string.h>
 
@@ -409,6 +410,48 @@ export_config_graph(ControlConnection *cc, GString *command, gpointer user_data)
   control_connection_send_reply(cc, result);
 }
 
+static void
+control_internal_logs(ControlConnection *cc, GString *command, gpointer user_data)
+{
+  GString *result = g_string_new("");
+  gchar **arguments = g_strsplit(command->str, " ", 0);
+  AFInterLive ret;
+
+  if (g_str_equal(arguments[1], "START"))
+    {
+      ret = afinter_start_live_collection();
+
+      switch (ret)
+        {
+        case AFINTER_LIVE_COLLECTION_STARTED:
+          g_string_assign(result, "OK Started to collect internal messages");
+          break;
+
+        case AFINTER_LIVE_COLLECTION_RUNNING:
+          g_string_assign(result, "FAIL Error: Live collection of internal logs is already running");
+          break;
+
+        case AFINTER_INTERNAL_SRC_PRESENT:
+          g_string_assign(result, "FAIL Error: Internal source is already configured");
+          break;
+
+        default:
+          break;
+        }
+    }
+  else if (g_str_equal(arguments[1], "STOP"))
+    {
+      afinter_stop_live_collection();
+      afinter_get_collected_messages(result);
+    }
+  else
+    {
+      g_string_assign(result, "FAIL Invalid arguments received");
+    }
+
+  control_connection_send_reply(cc, result);
+}
+
 ControlCommand default_commands[] =
 {
   { "LOG", control_connection_message_log },
@@ -420,6 +463,7 @@ ControlCommand default_commands[] =
   { "PWD", process_credentials },
   { "LISTFILES", control_connection_list_files },
   { "EXPORT_CONFIG_GRAPH", export_config_graph },
+  { "INTERLOGS", control_internal_logs },
   { NULL, NULL },
 };
 
