@@ -1,6 +1,8 @@
 /*
  * Copyright (c) 2014 Balabit
  * Copyright (c) 2013 Tihamer Petrovics <tihameri@gmail.com>
+ * Copyright (c) 2014 Gergely Nagy <algernon@balabit.hu>
+ * Copyright (c) 2021 Szilárd Parrag
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published
@@ -21,37 +23,25 @@
  *
  */
 
-#ifndef REDIS_H_INCLUDED
-#define REDIS_H_INCLUDED
+#ifndef REDIS_WORKER_H_INCLUDED
+#define REDIS_WORKER_H_INCLUDED
 
-#include "driver.h"
+#include <hiredis/hiredis.h>
+
+#include "syslog-ng.h"
 #include "logthrdest/logthrdestdrv.h"
 
 
-typedef struct _RedisDriver
+typedef struct _RedisDestWorker
 {
-  LogThreadedDestDriver super;
+  LogThreadedDestWorker super;
+  redisContext *c;
+  gint argc;
+  gchar **argv;
+  size_t *argvlen;
 
-  gchar *host;
-  gint   port;
-  gchar *auth;
-  struct timeval timeout;
+} RedisDestWorker;
 
-  LogTemplateOptions template_options;
-
-  GString *command;
-  GList *arguments;
-} RedisDriver;
-
-
-LogDriver *redis_dd_new(GlobalConfig *cfg);
-
-void redis_dd_set_timeout(LogDriver *d, const glong timeout);
-void redis_dd_set_host(LogDriver *d, const gchar *host);
-void redis_dd_set_port(LogDriver *d, gint port);
-void redis_dd_set_auth(LogDriver *d, const gchar *auth);
-void redis_dd_set_command_ref(LogDriver *d, const gchar *command,
-                              GList *arguments);
-LogTemplateOptions *redis_dd_get_template_options(LogDriver *d);
+LogThreadedDestWorker *redis_dw_new(LogThreadedDestDriver *owner, gint worker_index);
 
 #endif

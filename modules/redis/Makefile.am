@@ -13,6 +13,8 @@ modules_redis_libredis_la_SOURCES	=	\
 	modules/redis/redis-grammar.y 		\
 	modules/redis/redis.c			\
 	modules/redis/redis.h			\
+	modules/redis/redis-worker.h	\
+	modules/redis/redis-worker.c 	\
 	modules/redis/redis-parser.c		\
 	modules/redis/redis-parser.h
 modules_redis_libredis_la_LIBADD	=	\
