@@ -19,6 +19,7 @@ usr/lib/syslog-ng/*/libjson-plugin.so
 usr/lib/syslog-ng/*/libhook-commands.so
 usr/lib/syslog-ng/*/libkvformat.so
 usr/lib/syslog-ng/*/libtags-parser.so
+usr/lib/syslog-ng/*/libregexp-parser.so
 usr/lib/syslog-ng/*/liblinux-kmsg-format.so
 usr/lib/syslog-ng/*/libpseudofile.so
 usr/lib/syslog-ng/*/libsyslogformat.so

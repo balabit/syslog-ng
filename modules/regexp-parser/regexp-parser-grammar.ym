@@ -1,0 +1,87 @@
+/*
+ * Copyright (c) 2021 Balabit
+ * Copyright (c) 2021 Xiaoyu Qiu
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published
+ * by the Free Software Foundation, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * As an additional exemption you are allowed to compile & link against the
+ * OpenSSL libraries as published by the OpenSSL project. See the file
+ * COPYING for details.
+ *
+ */
+
+%code top {
+#include "regexp-parser-parser.h"
+}
+
+%code {
+
+#include "regexp-parser.h"
+#include "regexp-parser-parser.h"
+#include "cfg-parser.h"
+#include "cfg-grammar-internal.h"
+
+}
+
+%define api.prefix {regexp_parser_}
+
+/* this parameter is needed in order to instruct bison to use a complete
+ * argument list for yylex/yyerror */
+
+%lex-param {CfgLexer *lexer}
+%parse-param {CfgLexer *lexer}
+%parse-param {LogParser **instance}
+%parse-param {gpointer arg}
+
+/* INCLUDE_DECLS */
+
+%token KW_REGEXP_PARSER
+%token KW_PREFIX
+%token KW_PATTERNS
+
+%type	<ptr> parser_expr_regexp
+
+%%
+
+start
+	: LL_CONTEXT_PARSER parser_expr_regexp                  { YYACCEPT; }
+	;
+
+parser_expr_regexp
+	: KW_REGEXP_PARSER '('
+	  {
+	    last_parser = *instance = (LogParser *) regexp_parser_new(configuration);
+	  }
+	  parser_regexp_opts ')'
+	  {
+		CHECK_ERROR(regexp_parser_compile(last_parser), @$, "compiling the regexp failed");
+		$$ = last_parser;
+	  }
+	;
+
+parser_regexp_opts
+	: parser_regexp_opt parser_regexp_opts
+	|
+	;
+
+parser_regexp_opt
+	: { last_matcher_options = regexp_parser_get_matcher_options(last_parser); } matcher_option
+	| KW_PREFIX '(' string ')'		{ regexp_parser_set_prefix(last_parser, $3); free($3); }
+    | KW_PATTERNS '(' string_list ')'		{ regexp_parser_set_patterns(last_parser, $3); }
+	| parser_opt
+	;
+
+/* INCLUDE_RULES */
+
+%%

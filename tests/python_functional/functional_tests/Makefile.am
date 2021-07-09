@@ -23,6 +23,7 @@ EXTRA_DIST += \
 	tests/python_functional/functional_tests/parsers/checkpoint/test_checkpoint.py \
 	tests/python_functional/functional_tests/parsers/db_parser/test_db_parser.py \
 	tests/python_functional/functional_tests/parsers/panos/test_panos_parser.py \
+	tests/python_functional/functional_tests/parsers/regexp-parser/test_regexp_parser.py \
 	tests/python_functional/functional_tests/rewrites/set-tag/test_set_tag.py \
 	tests/python_functional/functional_tests/source_drivers/file_source/test_acceptance.py \
 	tests/python_functional/functional_tests/source_drivers/file_source/test_follow_freq_value.py \

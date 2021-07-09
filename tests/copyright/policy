@@ -103,7 +103,7 @@ tests/copyright/check.sh
 tests/python_functional
 modules/java/(tools|[^/]*$)
 modules/java-modules/(dummy|elastic-v2|hdfs|http|kafka|[^/]*$)
-modules/(afamqp|affile|afmongodb|afprog|afsmtp|afsocket|afsql|afstomp|afstreams|afuser|azure-auth-header|basicfuncs|cef|confgen|cryptofuncs|csvparser|timestamp|diskq|dbparser|geoip2|graphite|json|kvformat|linux-kmsg-format|pacctformat|pseudofile|python|redis|riemann|syslogformat|systemd-journal|getent|system-source|stardate|snmptrapd-parser|xml|openbsd|examples|kafka|afsnmp|mqtt|[^/]*$)
+modules/(afamqp|affile|afmongodb|afprog|afsmtp|afsocket|afsql|afstomp|afstreams|afuser|azure-auth-header|basicfuncs|cef|confgen|cryptofuncs|csvparser|timestamp|diskq|dbparser|geoip2|graphite|json|kvformat|linux-kmsg-format|pacctformat|pseudofile|python|redis|riemann|syslogformat|systemd-journal|getent|system-source|stardate|snmptrapd-parser|xml|openbsd|examples|kafka|afsnmp|mqtt|regexp-parser|[^/]*$)
 modules/(add-contextual-data|tagsparser|map-value-pairs|hook-commands|appmodel|[^/]*$)
 modules/cryptofuncs/cryptofuncs\.c$
 modules/cryptofuncs/tests/test_cryptofuncs\.c$

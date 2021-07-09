@@ -110,6 +110,9 @@ class SyslogNgConfig(object):
     def create_panos_parser(self, **options):
         return Parser("panos-parser", **options)
 
+    def create_regexp_parser(self, **options):
+        return Parser("regexp-parser", **options)
+
     def create_syslog_parser(self, **options):
         return Parser("syslog-parser", **options)
 

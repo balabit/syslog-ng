@@ -123,4 +123,6 @@ void log_matcher_options_defaults(LogMatcherOptions *options);
 void log_matcher_options_init(LogMatcherOptions *options);
 void log_matcher_options_destroy(LogMatcherOptions *options);
 
+void log_matcher_pcre_set_prefix(LogMatcher *s, const gchar *prefix);
+
 #endif
