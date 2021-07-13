@@ -45,6 +45,7 @@
 %token KW_COMMAND
 %token KW_AUTH
 %token KW_TIMEOUT
+%token KW_WORKERS
 
 %%
 
@@ -84,6 +85,10 @@ redis_option
         | KW_TIMEOUT '(' nonnegative_integer ')'
           {
             redis_dd_set_timeout(last_driver, $3);
+          }
+        | KW_WORKERS '(' positive_integer ')'
+          {
+            log_threaded_dest_driver_set_num_workers(last_driver, $3);
           }
         | threaded_dest_driver_option
         | { last_template_options = redis_dd_get_template_options(last_driver); } template_option
