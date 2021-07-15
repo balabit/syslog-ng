@@ -62,6 +62,9 @@ log_transport_aux_data_foreach(LogTransportAuxData *self, void (*func)(const gch
 {
   const gchar *p;
 
+  if (!self)
+    return;
+
   p = self->data;
   while (*p)
     {

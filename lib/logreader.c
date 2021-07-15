@@ -447,9 +447,12 @@ log_reader_handle_line(LogReader *self, const guchar *line, gint length, LogTran
   m = log_msg_new((gchar *) line, length,
                   &self->options->parse_options);
 
-  log_msg_set_saddr(m, aux->peer_addr ? : self->peer_addr);
-  log_msg_set_daddr(m, aux->local_addr ? : self->local_addr);
-  m->proto = aux->proto;
+  if (aux)
+    {
+      log_msg_set_saddr(m, aux->peer_addr ? : self->peer_addr);
+      log_msg_set_daddr(m, aux->local_addr ? : self->local_addr);
+      m->proto = aux->proto;
+    }
   log_msg_refcache_start_producer(m);
 
   log_transport_aux_data_foreach(aux, _add_aux_nvpair, m);
@@ -465,9 +468,12 @@ log_reader_fetch_log(LogReader *self)
 {
   gint msg_count = 0;
   gboolean may_read = TRUE;
-  LogTransportAuxData aux;
+  LogTransportAuxData aux_storage, *aux = &aux_storage;
 
-  log_transport_aux_data_init(&aux);
+  if ((self->options->flags & LR_IGNORE_AUX_DATA))
+    aux = NULL;
+
+  log_transport_aux_data_init(aux);
   if (log_proto_server_handshake_in_progress(self->proto))
     {
       return log_reader_process_handshake(self);
@@ -492,16 +498,16 @@ log_reader_fetch_log(LogReader *self)
        * protocol, it resets may_read to FALSE after the first read was issued.
        */
 
-      log_transport_aux_data_reinit(&aux);
+      log_transport_aux_data_reinit(aux);
       bookmark = ack_tracker_request_bookmark(self->super.ack_tracker);
-      status = log_proto_server_fetch(self->proto, &msg, &msg_len, &may_read, &aux, bookmark);
+      status = log_proto_server_fetch(self->proto, &msg, &msg_len, &may_read, aux, bookmark);
       switch (status)
         {
         case LPS_EOF:
-          g_sockaddr_unref(aux.peer_addr);
+          log_transport_aux_data_destroy(aux);
           return NC_CLOSE;
         case LPS_ERROR:
-          g_sockaddr_unref(aux.peer_addr);
+          log_transport_aux_data_destroy(aux);
           return NC_READ_ERROR;
         case LPS_SUCCESS:
           break;
@@ -521,14 +527,14 @@ log_reader_fetch_log(LogReader *self)
         {
           msg_count++;
 
-          if (!log_reader_handle_line(self, msg, msg_len, &aux))
+          if (!log_reader_handle_line(self, msg, msg_len, aux))
             {
               /* window is full, don't generate further messages */
               break;
             }
         }
     }
-  log_transport_aux_data_destroy(&aux);
+  log_transport_aux_data_destroy(aux);
 
   if (msg_count == self->options->fetch_limit)
     self->immediate_check = TRUE;
@@ -782,6 +788,7 @@ CfgFlagHandler log_reader_flag_handlers[] =
   { "kernel",                     CFH_SET, offsetof(LogReaderOptions, flags),               LR_KERNEL },
   { "empty-lines",                CFH_SET, offsetof(LogReaderOptions, flags),               LR_EMPTY_LINES },
   { "threaded",                   CFH_SET, offsetof(LogReaderOptions, flags),               LR_THREADED },
+  { "ignore-aux-data",            CFH_SET, offsetof(LogReaderOptions, flags),               LR_IGNORE_AUX_DATA },
   { NULL },
 };
 

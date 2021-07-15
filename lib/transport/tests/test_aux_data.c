@@ -128,6 +128,26 @@ Test(aux_data, test_aux_data_copy_separates_the_copies)
 Test(aux_data, test_add_nv_pair_to_a_NULL_aux_data_will_do_nothing)
 {
   log_transport_aux_data_add_nv_pair(NULL, "foo", "bar");
+  assert_concatenated_nvpairs(NULL, "");
+}
+
+Test(aux_data, test_aux_data_functions_with_NULL_instance_does_nothing)
+{
+  aux = NULL;
+
+  log_transport_aux_data_init(aux);
+  log_transport_aux_data_reinit(aux);
+  log_transport_aux_data_destroy(aux);
+
+  log_transport_aux_data_init(aux);
+  /* set peer_addr twice to validate that peer_addr is correctly reference counted */
+  log_transport_aux_data_set_peer_addr_ref(aux, g_sockaddr_inet_new("1.2.3.4", 5555));
+  log_transport_aux_data_set_peer_addr_ref(aux, g_sockaddr_inet_new("1.2.3.4", 5555));
+#if 0
+  log_transport_aux_data_add_nv_pair(aux, "foo", "bar");
+  assert_concatenated_nvpairs(aux, "");
+  log_transport_aux_data_destroy(aux);
+#endif
 }
 
 static void
