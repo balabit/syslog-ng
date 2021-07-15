@@ -315,6 +315,10 @@ system_generate_system_transports(GString *sysblock, CfgArgs *args)
     {
       g_string_append(sysblock, "openbsd();");
     }
+  else if (strcmp(u.sysname, "Darwin") == 0)
+    {
+      system_sysblock_add_file(sysblock, "/var/log/system.log", 1,NULL, NULL, NULL, FALSE);
+    }
   else
     {
       msg_error("system(): Error detecting platform, unable to define the system() source. "
