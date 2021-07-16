@@ -36,6 +36,7 @@ static CfgLexerKeyword redis_keywords[] =
   { "port",     KW_PORT },
   { "auth",     KW_AUTH },
   { "timeout",  KW_TIMEOUT },
+  { "workers", KW_WORKERS },
   { NULL }
 };
 

@@ -8,6 +8,8 @@ endif()
 set(REDIS_SOURCES
     "redis-parser.h"
     "redis.h"
+    "redis-worker.h"
+    "redis-worker.c"
     "redis-parser.c"
     "redis.c"
 )
