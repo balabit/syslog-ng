@@ -26,6 +26,7 @@
 #include "messages.h"
 #include "cfg.h"
 #include "str-utils.h"
+#include "scratch-buffers.h"
 #include "compat/string.h"
 #include "compat/pcre.h"
 
@@ -291,6 +292,8 @@ typedef struct _LogMatcherPcreRe
   pcre *pattern;
   pcre_extra *extra;
   gint match_options;
+  gchar *prefix;
+  gint prefix_len;
 } LogMatcherPcreRe;
 
 static gboolean
@@ -414,6 +417,26 @@ log_matcher_pcre_re_feed_backrefs(LogMatcher *s, LogMessage *msg, gint value_han
     }
 }
 
+static inline void
+log_matcher_pcre_re_feed_value_by_name(LogMatcherPcreRe *s, LogMessage *msg, GString *formatted_name, gchar *tabptr,
+                                       const gchar *value, gint begin_index, gint end_index)
+{
+  if(s->prefix != NULL)
+    {
+      if (formatted_name->len > 0)
+        g_string_truncate(formatted_name, s->prefix_len);
+      else
+        g_string_assign(formatted_name, s->prefix);
+      g_string_append(formatted_name, tabptr + 2);
+
+      log_msg_set_value_by_name(msg, formatted_name->str, value + begin_index, end_index - begin_index);
+    }
+  else
+    {
+      log_msg_set_value_by_name(msg, tabptr + 2, value + begin_index, end_index - begin_index);
+    }
+}
+
 static void
 log_matcher_pcre_re_feed_named_substrings(LogMatcher *s, LogMessage *msg, int *matches, const gchar *value)
 {
@@ -435,6 +458,7 @@ log_matcher_pcre_re_feed_named_substrings(LogMatcher *s, LogMessage *msg, int *m
       /* Now we can scan the table and, for each entry, print the number, the name,
          and the substring itself.
        */
+      GString *formatted_name = scratch_buffers_alloc();
       tabptr = name_table;
       for (i = 0; i < namecount; i++, tabptr += name_entry_size)
         {
@@ -445,7 +469,7 @@ log_matcher_pcre_re_feed_named_substrings(LogMatcher *s, LogMessage *msg, int *m
           if (begin_index < 0 || end_index < 0)
             continue;
 
-          log_msg_set_value_by_name(msg, tabptr + 2, value + begin_index, end_index - begin_index);
+          log_matcher_pcre_re_feed_value_by_name(self, msg, formatted_name, tabptr, value, begin_index, end_index);
         }
     }
 }
@@ -646,6 +670,8 @@ LogMatcher *
 log_matcher_pcre_re_new(const LogMatcherOptions *options)
 {
   LogMatcherPcreRe *self = g_new0(LogMatcherPcreRe, 1);
+  self->prefix = NULL;
+  self->prefix_len = 0;
 
   log_matcher_init(&self->super, options);
   self->super.compile = log_matcher_pcre_re_compile;
@@ -654,6 +680,24 @@ log_matcher_pcre_re_new(const LogMatcherOptions *options)
   self->super.free_fn = log_matcher_pcre_re_free;
 
   return &self->super;
+}
+
+void
+log_matcher_pcre_set_prefix(LogMatcher *s, const gchar *prefix)
+{
+  LogMatcherPcreRe *self = (LogMatcherPcreRe *) s;
+
+  g_free(self->prefix);
+  if (prefix)
+    {
+      self->prefix = g_strdup(prefix);
+      self->prefix_len = strlen(prefix);
+    }
+  else
+    {
+      self->prefix = NULL;
+      self->prefix_len = 0;
+    }
 }
 
 typedef LogMatcher *(*LogMatcherConstructFunc)(const LogMatcherOptions *options);
