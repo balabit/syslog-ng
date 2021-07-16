@@ -60,10 +60,13 @@ stats_format_csv_escapevar(const gchar *var)
 static void
 stats_format_csv(StatsCluster *sc, gint type, StatsCounterItem *counter, gpointer user_data)
 {
-  GString *csv = (GString *) user_data;
+  gpointer *args = (gpointer *) user_data;
+  csv_record_cb process_record = (csv_record_cb) args[0];
+  gpointer process_record_arg = args[1];
   gchar *s_id, *s_instance, *tag_name;
   gchar buf[32];
   gchar state;
+  GString *csv = g_string_sized_new(512);
 
   s_id = stats_format_csv_escapevar(sc->key.id);
   s_instance = stats_format_csv_escapevar(sc->key.instance);
@@ -76,24 +79,27 @@ stats_format_csv(StatsCluster *sc, gint type, StatsCounterItem *counter, gpointe
     state = 'a';
 
   tag_name = stats_format_csv_escapevar(stats_cluster_get_type_name(sc, type));
-  g_string_append_printf(csv, "%s;%s;%s;%c;%s;%"G_GSIZE_FORMAT"\n",
-                         stats_cluster_get_component_name(sc, buf, sizeof(buf)),
-                         s_id, s_instance, state, tag_name, stats_counter_get(&sc->counter_group.counters[type]));
+  g_string_printf(csv, "%s;%s;%s;%c;%s;%"G_GSIZE_FORMAT"\n",
+                  stats_cluster_get_component_name(sc, buf, sizeof(buf)),
+                  s_id, s_instance, state, tag_name, stats_counter_get(&sc->counter_group.counters[type]));
+  process_record(csv->str, process_record_arg);
+  g_string_free(csv, TRUE);
   g_free(tag_name);
   g_free(s_id);
   g_free(s_instance);
 }
 
-
-gchar *
-stats_generate_csv(void)
+void
+stats_generate_csv(csv_record_cb process_record, gpointer user_data, gboolean *cancelled)
 {
-  GString *csv = g_string_sized_new(1024);
+  GString *csv = g_string_sized_new(512);
 
-  g_string_append_printf(csv, "%s;%s;%s;%s;%s;%s\n", "SourceName", "SourceId", "SourceInstance", "State", "Type",
-                         "Number");
+  g_string_printf(csv, "%s;%s;%s;%s;%s;%s\n", "SourceName", "SourceId", "SourceInstance", "State", "Type",
+                  "Number");
+  process_record(csv->str, user_data);
+  g_string_free(csv, TRUE);
+  gpointer format_csv_args[] = {process_record, user_data};
   stats_lock();
-  stats_foreach_counter(stats_format_csv, csv);
+  stats_foreach_counter(stats_format_csv, format_csv_args, cancelled);
   stats_unlock();
-  return g_string_free(csv, FALSE);
 }

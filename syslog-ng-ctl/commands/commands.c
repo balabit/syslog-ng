@@ -72,13 +72,13 @@ slng_send_cmd(const gchar *cmd)
   return TRUE;
 }
 
-GString *
-slng_run_command(const gchar *command)
+gint
+slng_run_command(const gchar *command, response_handle cb, gpointer user_data)
 {
   if (!slng_send_cmd(command))
-    return NULL;
+    return 1;
 
-  return control_client_read_reply(control_client);
+  return control_client_read_reply(control_client, cb, user_data);
 }
 
 static gboolean
@@ -87,34 +87,29 @@ _is_response_empty(GString *response)
   return (response == NULL || g_str_equal(response->str, ""));
 }
 
-static void
-clear_and_free(GString *str)
+static gint
+_print_reply_to_stdout(GString *reply, gpointer user_data)
 {
-  if (str)
+  gboolean first_response = *((gboolean *)user_data);
+  gint retval = 0;
+  if (first_response)
     {
-      memset(str->str, 0, str->len);
-      g_string_free(str, TRUE);
+      if (_is_response_empty(reply))
+        retval = 1;
+      else retval = process_response_status(reply);
     }
+
+  printf("%s", reply->str);
+  return retval;
 }
 
 gint
 dispatch_command(const gchar *cmd)
 {
+  gboolean first_response = TRUE;
   gint retval = 0;
   gchar *dispatchable_command = g_strdup_printf("%s\n", cmd);
-  GString *rsp = slng_run_command(dispatchable_command);
-
-  if (_is_response_empty(rsp))
-    {
-      retval = 1;
-    }
-  else
-    {
-      retval = process_response_status(rsp);
-      printf("%s\n", rsp->str);
-    }
-
-  clear_and_free(rsp);
+  retval = slng_run_command(dispatchable_command, _print_reply_to_stdout, &first_response);
 
   secret_storage_wipe(dispatchable_command, strlen(dispatchable_command));
   g_free(dispatchable_command);

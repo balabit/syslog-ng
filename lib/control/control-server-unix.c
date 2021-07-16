@@ -75,6 +75,16 @@ control_connection_unix_stop_watches(ControlConnection *s)
   iv_fd_unregister(&self->control_io);
 }
 
+static gboolean
+_pending_output(ControlConnection *s)
+{
+  g_mutex_lock(s->response_batches_lock);
+  gboolean result = (s->output_buffer && s->output_buffer->len > s->pos) ||
+                    !g_queue_is_empty(s->response_batches);
+  g_mutex_unlock(s->response_batches_lock);
+  return result;
+}
+
 static void
 control_connection_unix_update_watches(ControlConnection *s)
 {
@@ -85,7 +95,7 @@ control_connection_unix_update_watches(ControlConnection *s)
       iv_fd_set_handler_out(&self->control_io, NULL);
       iv_fd_set_handler_in(&self->control_io, NULL);
     }
-  else if (s->output_buffer->len > s->pos)
+  else if (_pending_output(s))
     {
       iv_fd_set_handler_out(&self->control_io, s->handle_output);
       iv_fd_set_handler_in(&self->control_io, NULL);

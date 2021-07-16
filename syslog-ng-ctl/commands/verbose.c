@@ -35,11 +35,33 @@ GOptionEntry verbose_options[] =
   { NULL, 0, 0, G_OPTION_ARG_NONE, NULL, NULL }
 };
 
+static gboolean
+_is_response_empty(GString *response)
+{
+  return (response == NULL || g_str_equal(response->str, ""));
+}
+
+static gint
+_print_reply_to_stdout(GString *reply, gpointer user_data)
+{
+  gboolean first_response = *((gboolean *)user_data);
+  gint retval = 0;
+  if (first_response)
+    {
+      if (_is_response_empty(reply))
+        retval = 1;
+      else retval = process_response_status(reply);
+    }
+
+  printf("%s\n", reply->str);
+
+  return retval;
+}
+
 gint
 slng_verbose(int argc, char *argv[], const gchar *mode, GOptionContext *ctx)
 {
-  gint ret = 0;
-  GString *rsp = NULL;
+  gboolean first_response = TRUE;
   gchar buff[256];
 
   if (!verbose_set)
@@ -50,14 +72,5 @@ slng_verbose(int argc, char *argv[], const gchar *mode, GOptionContext *ctx)
 
   g_strup(buff);
 
-  rsp = slng_run_command(buff);
-  if (rsp == NULL)
-    return 1;
-
-  ret = process_response_status(rsp);
-  printf("%s\n", rsp->str);
-
-  g_string_free(rsp, TRUE);
-
-  return ret;
+  return slng_run_command(buff, _print_reply_to_stdout, &first_response);
 }

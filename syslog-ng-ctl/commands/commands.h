@@ -40,8 +40,10 @@ typedef struct _CommandDescriptor
   struct _CommandDescriptor *subcommands;
 } CommandDescriptor;
 
+typedef gint (*response_handle)(GString *response, gpointer user_data);
+
 gint dispatch_command(const gchar *cmd);
-GString *slng_run_command(const gchar *command);
+gint slng_run_command(const gchar *command, response_handle cb, gpointer user_data);
 gint process_response_status(GString *response);
 gboolean is_syslog_ng_running(void);
 

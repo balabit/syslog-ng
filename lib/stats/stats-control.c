@@ -56,18 +56,40 @@ static void
 _reset_counters(void)
 {
   stats_lock();
-  stats_foreach_counter(_reset_counter_if_needed, NULL);
+  stats_foreach_counter(_reset_counter_if_needed, NULL, NULL);
   stats_unlock();
+}
+
+static void
+_send_batched_response(const gchar *record, gpointer user_data)
+{
+  static const gsize BATCH_LEN = 2048;
+
+  gpointer *args = (gpointer *) user_data;
+  ControlConnection *cc = (ControlConnection *) args[0];
+  GString **batch = (GString **) args[1];
+
+  if (!*batch)
+    *batch = g_string_sized_new(512);
+  g_string_append_printf(*batch, "%s", record);
+
+  if ((*batch)->len > BATCH_LEN)
+    {
+      control_connection_send_batched_reply(cc, *batch);
+      *batch = NULL;
+    }
 }
 
 static GString *
 _send_stats_get_result(ControlConnection *cc, GString *command, gpointer user_data)
 {
-  gchar *stats = stats_generate_csv();
-  GString *response = g_string_new(stats);
-  g_free(stats);
-
-  return response;
+  GString *response = NULL;
+  gpointer args[] = {cc, &response};
+  stats_generate_csv(_send_batched_response, args, &cc->server->cancelled);
+  if (response != NULL)
+    control_connection_send_batched_reply(cc, response);
+  control_connection_send_close_batch(cc);
+  return NULL;
 }
 
 static void

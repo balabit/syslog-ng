@@ -386,14 +386,29 @@ _foreach_cluster_helper(gpointer key, gpointer value, gpointer user_data)
   func(sc, func_data);
 }
 
+static void
+_foreach_cluster(GHashTable *clusters, gpointer *args, gboolean *cancelled)
+{
+  GHashTableIter iter;
+  g_hash_table_iter_init(&iter, clusters);
+  gpointer key, value;
+
+  while (g_hash_table_iter_next(&iter, &key, &value))
+    {
+      if (cancelled && *cancelled)
+        break;
+      _foreach_cluster_helper(key, value, args);
+    }
+}
+
 void
-stats_foreach_cluster(StatsForeachClusterFunc func, gpointer user_data)
+stats_foreach_cluster(StatsForeachClusterFunc func, gpointer user_data, gboolean *cancelled)
 {
   gpointer args[] = { func, user_data };
 
   g_assert(stats_locked);
-  g_hash_table_foreach(stats_cluster_container.static_clusters, _foreach_cluster_helper, args);
-  g_hash_table_foreach(stats_cluster_container.dynamic_clusters, _foreach_cluster_helper, args);
+  _foreach_cluster(stats_cluster_container.static_clusters, args, cancelled);
+  _foreach_cluster(stats_cluster_container.dynamic_clusters, args, cancelled);
 }
 
 static gboolean
@@ -426,12 +441,12 @@ _foreach_counter_helper(StatsCluster *sc, gpointer user_data)
 }
 
 void
-stats_foreach_counter(StatsForeachCounterFunc func, gpointer user_data)
+stats_foreach_counter(StatsForeachCounterFunc func, gpointer user_data, gboolean *cancelled)
 {
   gpointer args[] = { func, user_data };
 
   g_assert(stats_locked);
-  stats_foreach_cluster(_foreach_counter_helper, args);
+  stats_foreach_cluster(_foreach_counter_helper, args, cancelled);
 }
 
 void

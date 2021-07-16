@@ -86,40 +86,43 @@ control_client_send_command(ControlClient *self, const gchar *cmd)
 
 #define BUFF_LEN 8192
 
-GString *
-control_client_read_reply(ControlClient *self)
+gint
+control_client_read_reply(ControlClient *self, response_handle response_handler, gpointer user_data)
 {
+  gint retval = 0;
   gssize len = 0;
   gchar buff[BUFF_LEN];
-  GString *reply = g_string_sized_new(256);
+  gboolean received_all = FALSE;
 
-  while (1)
+  while (!received_all)
     {
       if ((len = read(self->control_socket, buff, BUFF_LEN - 1)) < 0)
         {
           fprintf(stderr, "Error reading control socket, error='%s'\n", strerror(errno));
-          g_string_free(reply, TRUE);
-          return NULL;
+          return 1;
         }
 
       if (len == 0)
         {
           fprintf(stderr, "EOF occurred while reading control socket\n");
-          g_string_free(reply, TRUE);
-          return NULL;
+          return 1;
         }
 
-      g_string_append_len(reply, buff, len);
-
+      GString *reply = g_string_new_len(buff, len);
       if (reply->str[reply->len - 1] == '\n' &&
           reply->str[reply->len - 2] == '.' &&
           reply->str[reply->len - 3] == '\n')
         {
-          g_string_truncate(reply, reply->len - 3);
-          break;
+          g_string_truncate(reply, reply->len - 2);
+          received_all = TRUE;
         }
+      retval = response_handler(reply, user_data);
+      g_string_free(reply, TRUE);
+      if (retval != 0)
+        break;
     }
-  return reply;
+
+  return retval;
 }
 
 void

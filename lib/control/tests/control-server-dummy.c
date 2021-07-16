@@ -64,7 +64,7 @@ control_connection_dummy_update_watches(ControlConnection *s)
 {
   if (s->waiting_for_output)
     g_assert_not_reached();
-  else if (s->output_buffer->len > s->pos)
+  else if (!g_queue_is_empty(s->response_batches) || s->output_buffer)
     s->handle_output(s);
 }
 

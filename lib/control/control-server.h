@@ -25,13 +25,20 @@
 
 #include "syslog-ng.h"
 #include "control.h"
+#include "atomic.h"
+#include <iv_event.h>
 #include <stdio.h>
 
 #define MAX_CONTROL_LINE_LENGTH 4096
 
 struct _ControlConnection
 {
+  GAtomicCounter ref_cnt;
+  GQueue *response_batches;
+  GMutex *response_batches_lock;
+  struct iv_event evt_response_added;
   gboolean waiting_for_output;
+  gboolean watches_are_running;
   GString *input_buffer;
   GString *output_buffer;
   gsize pos;
@@ -53,6 +60,7 @@ struct _ControlConnection
 struct _ControlServer
 {
   GList *worker_threads;
+  gboolean cancelled;
   gchar *control_socket_name;
   void (*free_fn)(ControlServer *self);
 };
@@ -69,10 +77,14 @@ void control_connection_start_as_thread(ControlConnection *self, ControlConnecti
                                         GString *command, gpointer user_data);
 
 void control_connection_send_reply(ControlConnection *self, GString *reply);
+void control_connection_send_batched_reply(ControlConnection *self, GString *reply);
+void control_connection_send_close_batch(ControlConnection *self);
 void control_connection_start_watches(ControlConnection *self);
 void control_connection_update_watches(ControlConnection *self);
 void control_connection_stop_watches(ControlConnection *self);
-void control_connection_free(ControlConnection *self);
 void control_connection_init_instance(ControlConnection *self, ControlServer *server);
+
+ControlConnection *control_connection_ref(ControlConnection *self);
+void control_connection_unref(ControlConnection *self);
 
 #endif

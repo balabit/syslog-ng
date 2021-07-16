@@ -43,31 +43,22 @@ typedef struct _ThreadedCommandRunner
   GThread *thread;
   struct
   {
-    GMutex *tid_saved_lock;
-    GCond *tid_saved_cond;
-    gboolean tid_saved;
-    ThreadId tid;
     GMutex *state_lock;
     gboolean cancelled;
     gboolean finished;
   } real_thread;
   ControlConnectionCommand func;
-  GString *response;
-  struct iv_event response_received;
+  struct iv_event thread_finished;
 } ThreadedCommandRunner;
 
 static ThreadedCommandRunner *
 _thread_command_runner_new(ControlConnection *cc, GString *cmd, gpointer user_data)
 {
   ThreadedCommandRunner *self = g_new0(ThreadedCommandRunner, 1);
-  self->connection = cc;
+  self->connection = control_connection_ref(cc);
   self->command = g_string_new(cmd->str);
   self->user_data = user_data;
-  self->real_thread.tid_saved_lock = g_mutex_new();
-  self->real_thread.tid_saved_cond = g_cond_new();
   self->real_thread.state_lock = g_mutex_new();
-  self->real_thread.tid_saved = FALSE;
-  self->real_thread.tid = 0;
 
   return self;
 }
@@ -75,39 +66,18 @@ _thread_command_runner_new(ControlConnection *cc, GString *cmd, gpointer user_da
 static void
 _thread_command_runner_free(ThreadedCommandRunner *self)
 {
-  g_mutex_free(self->real_thread.tid_saved_lock);
-  g_cond_free(self->real_thread.tid_saved_cond);
   g_mutex_free(self->real_thread.state_lock);
   g_string_free(self->command, TRUE);
+  control_connection_unref(self->connection);
   g_free(self);
 }
 
 static void
-_thread_command_runner_wait_for_tid_saved(ThreadedCommandRunner *self)
-{
-  g_mutex_lock(self->real_thread.tid_saved_lock);
-  while (self->real_thread.tid_saved == FALSE)
-    g_cond_wait(self->real_thread.tid_saved_cond, self->real_thread.tid_saved_lock);
-  g_mutex_unlock(self->real_thread.tid_saved_lock);
-}
-
-static void
-_thread_command_runner_save_tid(ThreadedCommandRunner *self)
-{
-  g_mutex_lock(self->real_thread.tid_saved_lock);
-  self->real_thread.tid = get_thread_id();
-  self->real_thread.tid_saved = TRUE;
-  g_cond_broadcast(self->real_thread.tid_saved_cond);
-  g_mutex_unlock(self->real_thread.tid_saved_lock);
-}
-
-static void
-_send_response(gpointer user_data)
+_on_thread_finished(gpointer user_data)
 {
   ThreadedCommandRunner *self = (ThreadedCommandRunner *) user_data;
   g_thread_join(self->thread);
-  control_connection_send_reply(self->connection, self->response);
-  iv_event_unregister(&self->response_received);
+  iv_event_unregister(&self->thread_finished);
   ControlServer *server = self->connection->server;
   server->worker_threads = g_list_remove(server->worker_threads, self);
   _thread_command_runner_free(self);
@@ -117,13 +87,14 @@ static void
 _thread(gpointer user_data)
 {
   ThreadedCommandRunner *self = (ThreadedCommandRunner *)user_data;
-  _thread_command_runner_save_tid(self);
-  self->response = self->func(self->connection, self->command, self->user_data);
+  GString *response = self->func(self->connection, self->command, self->user_data);
+  if (response)
+    control_connection_send_reply(self->connection, response);
   g_mutex_lock(self->real_thread.state_lock);
   {
     self->real_thread.finished = TRUE;
     if (!self->real_thread.cancelled)
-      iv_event_post(&self->response_received);
+      iv_event_post(&self->thread_finished);
   }
   g_mutex_unlock(self->real_thread.state_lock);
 }
@@ -133,16 +104,20 @@ _thread_command_runner_sync_run(ThreadedCommandRunner *self, ControlConnectionCo
 {
   msg_warning("Cannot start a separated thread - ControlServer is not running",
               evt_tag_str("command", self->command->str));
-  control_connection_send_reply(self->connection, func(self->connection, self->command, self->user_data));
+
+  GString *response = func(self->connection, self->command, self->user_data);
+  if (response)
+    control_connection_send_reply(self->connection, response);
+
   _thread_command_runner_free(self);
 }
 
 static void
 _thread_command_runner_run(ThreadedCommandRunner *self, ControlConnectionCommand func)
 {
-  IV_EVENT_INIT(&self->response_received);
-  self->response_received.handler = _send_response;
-  self->response_received.cookie = self;
+  IV_EVENT_INIT(&self->thread_finished);
+  self->thread_finished.handler = _on_thread_finished;
+  self->thread_finished.cookie = self;
   self->func = func;
 
   if (!main_loop_is_control_server_running(main_loop_get_instance()))
@@ -151,10 +126,9 @@ _thread_command_runner_run(ThreadedCommandRunner *self, ControlConnectionCommand
       return;
     }
 
-  iv_event_register(&self->response_received);
+  iv_event_register(&self->thread_finished);
 
   self->thread = g_thread_new(self->command->str, (GThreadFunc) _thread, self);
-  _thread_command_runner_wait_for_tid_saved(self);
   ControlServer *server = self->connection->server;
   server->worker_threads = g_list_append(server->worker_threads, self);
 }
@@ -171,7 +145,6 @@ static void
 _delete_thread_command_runner(gpointer data)
 {
   ThreadedCommandRunner *self = (ThreadedCommandRunner *) data;
-  g_assert(self->real_thread.tid_saved == TRUE);
   gboolean has_to_free = FALSE;
 
   g_mutex_lock(self->real_thread.state_lock);
@@ -179,7 +152,6 @@ _delete_thread_command_runner(gpointer data)
     self->real_thread.cancelled = TRUE;
     if (!self->real_thread.finished)
       {
-        thread_cancel(self->real_thread.tid);
         has_to_free = TRUE;
       }
   }
@@ -197,6 +169,7 @@ control_server_cancel_workers(ControlServer *self)
 {
   if (self->worker_threads)
     {
+      self->cancelled = TRUE; // racy, but it's okay
       msg_warning("Cancelling control server worker threads");
       g_list_free_full(self->worker_threads, _delete_thread_command_runner);
       msg_warning("Control server worker threads has been cancelled.");
@@ -208,7 +181,7 @@ void
 control_server_connection_closed(ControlServer *self, ControlConnection *cc)
 {
   control_connection_stop_watches(cc);
-  control_connection_free(cc);
+  control_connection_unref(cc);
 }
 
 void
@@ -216,6 +189,7 @@ control_server_init_instance(ControlServer *self, const gchar *path)
 {
   self->control_socket_name = g_strdup(path);
   self->worker_threads = NULL;
+  self->cancelled = FALSE;
 }
 
 void
@@ -235,36 +209,69 @@ control_server_free(ControlServer *self)
   g_free(self);
 }
 
-void
-control_connection_free(ControlConnection *self)
+static void
+_g_string_destroy(gpointer user_data)
+{
+  GString *str = (GString *) user_data;
+  g_string_free(str, TRUE);
+}
+
+static void
+_control_connection_free(ControlConnection *self)
 {
   if (self->free_fn)
     {
       self->free_fn(self);
     }
-  g_string_free(self->output_buffer, TRUE);
+  /*
+   * when write() fails, control_connection_closed() is called,
+   * which then calls this free func and in this case output_buffer is not NULL
+   * */
+  if (self->output_buffer)
+    g_string_free(self->output_buffer, TRUE);
   g_string_free(self->input_buffer, TRUE);
+  g_queue_free_full(self->response_batches, _g_string_destroy);
+  g_mutex_free(self->response_batches_lock);
+  iv_event_unregister(&self->evt_response_added);
   g_free(self);
+}
+
+void
+control_connection_send_batched_reply(ControlConnection *self, GString *reply)
+{
+  g_mutex_lock(self->response_batches_lock);
+  g_queue_push_tail(self->response_batches, reply);
+  g_mutex_unlock(self->response_batches_lock);
+
+  self->waiting_for_output = FALSE;
+
+  iv_event_post(&self->evt_response_added);
+}
+
+void
+control_connection_send_close_batch(ControlConnection *self)
+{
+  g_mutex_lock(self->response_batches_lock);
+  GString *last = (GString *) g_queue_peek_tail(self->response_batches);
+  if (last)
+    {
+      if (last->str[last->len - 1] != '\n')
+        g_string_append_c(last, '\n');
+      g_string_append(last, ".\n");
+      g_mutex_unlock(self->response_batches_lock);
+    }
+  else
+    {
+      g_mutex_unlock(self->response_batches_lock);
+      control_connection_send_batched_reply(self, g_string_new("\n.\n"));
+    }
 }
 
 void
 control_connection_send_reply(ControlConnection *self, GString *reply)
 {
-  g_string_assign(self->output_buffer, reply->str);
-  g_string_free(reply, TRUE);
-
-  self->pos = 0;
-  self->waiting_for_output = FALSE;
-
-  g_assert(self->output_buffer->len > 0);
-
-  if (self->output_buffer->str[self->output_buffer->len - 1] != '\n')
-    {
-      g_string_append_c(self->output_buffer, '\n');
-    }
-  g_string_append(self->output_buffer, ".\n");
-
-  control_connection_update_watches(self);
+  control_connection_send_batched_reply(self, reply);
+  control_connection_send_close_batch(self);
 }
 
 static void
@@ -273,6 +280,15 @@ control_connection_io_output(gpointer s)
   ControlConnection *self = (ControlConnection *) s;
   gint rc;
 
+  if (!self->output_buffer)
+    {
+      g_mutex_lock(self->response_batches_lock);
+      self->output_buffer = g_queue_pop_head(self->response_batches);
+      g_mutex_unlock(self->response_batches_lock);
+      self->pos = 0;
+    }
+
+  g_assert(self->output_buffer);
   rc = self->write(self, self->output_buffer->str + self->pos, self->output_buffer->len - self->pos);
   if (rc < 0)
     {
@@ -287,6 +303,14 @@ control_connection_io_output(gpointer s)
   else
     {
       self->pos += rc;
+      if (self->pos == self->output_buffer->len)
+        {
+          g_string_free(self->output_buffer, TRUE);
+          g_mutex_lock(self->response_batches_lock);
+          self->output_buffer = g_queue_pop_head(self->response_batches);
+          g_mutex_unlock(self->response_batches_lock);
+          self->pos = 0;
+        }
     }
   control_connection_update_watches(self);
 }
@@ -294,8 +318,10 @@ control_connection_io_output(gpointer s)
 void
 control_connection_wait_for_output(ControlConnection *self)
 {
-  if (self->output_buffer->len == 0)
+  g_mutex_lock(self->response_batches_lock);
+  if (g_queue_is_empty(self->response_batches) && !self->output_buffer)
     self->waiting_for_output = TRUE;
+  g_mutex_unlock(self->response_batches_lock);
   control_connection_update_watches(self);
 }
 
@@ -385,28 +411,69 @@ destroy_connection:
   control_server_connection_closed(self->server, self);
 }
 
+static void
+_on_evt_response_added(gpointer user_data)
+{
+  ControlConnection *self = (ControlConnection *) user_data;
+  control_connection_update_watches(self);
+}
+
 void
 control_connection_init_instance(ControlConnection *self, ControlServer *server)
 {
+  g_atomic_counter_set(&self->ref_cnt, 1);
   self->server = server;
-  self->output_buffer = g_string_sized_new(256);
   self->input_buffer = g_string_sized_new(128);
   self->handle_input = control_connection_io_input;
   self->handle_output = control_connection_io_output;
+  self->response_batches = g_queue_new();
+  self->response_batches_lock = g_mutex_new();
+
+  IV_EVENT_INIT(&self->evt_response_added);
+  self->evt_response_added.cookie = self;
+  self->evt_response_added.handler = _on_evt_response_added;
+
+  iv_event_register(&self->evt_response_added);
+
   return;
 }
 
+ControlConnection *
+control_connection_ref(ControlConnection *self)
+{
+  g_assert(!self || g_atomic_counter_get(&self->ref_cnt) > 0);
+
+  if (self)
+    g_atomic_counter_inc(&self->ref_cnt);
+
+  return self;
+}
+
+void
+control_connection_unref(ControlConnection *self)
+{
+  g_assert(!self || g_atomic_counter_get(&self->ref_cnt));
+
+  if (self && (g_atomic_counter_dec_and_test(&self->ref_cnt)))
+    _control_connection_free(self);
+}
 
 void
 control_connection_start_watches(ControlConnection *self)
 {
   if (self->events.start_watches)
-    self->events.start_watches(self);
+    {
+      self->watches_are_running = TRUE;
+      self->events.start_watches(self);
+    }
 }
 
 void
 control_connection_update_watches(ControlConnection *self)
 {
+  if (!self->watches_are_running)
+    return;
+
   if (self->events.update_watches)
     self->events.update_watches(self);
 }
@@ -415,5 +482,8 @@ void
 control_connection_stop_watches(ControlConnection *self)
 {
   if (self->events.stop_watches)
-    self->events.stop_watches(self);
+    {
+      self->events.stop_watches(self);
+      self->watches_are_running = FALSE;
+    }
 }

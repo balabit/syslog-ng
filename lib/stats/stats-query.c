@@ -130,7 +130,7 @@ _update_index(void)
 {
   g_static_mutex_lock(&stats_query_mutex);
   stats_lock();
-  stats_foreach_cluster(_update_indexes_of_cluster_if_needed, NULL);
+  stats_foreach_cluster(_update_indexes_of_cluster_if_needed, NULL, NULL);
   stats_unlock();
   g_static_mutex_unlock(&stats_query_mutex);
 }
