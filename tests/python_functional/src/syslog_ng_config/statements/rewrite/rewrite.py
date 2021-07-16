@@ -34,3 +34,8 @@ class Rewrite(object):
 class SetTag(Rewrite):
     def __init__(self, tag, **options):
         super(SetTag, self).__init__("set_tag", [tag], **options)
+
+
+class SetPri(Rewrite):
+    def __init__(self, pri, **options):
+        super(SetPri, self).__init__("set_pri", [pri], **options)
