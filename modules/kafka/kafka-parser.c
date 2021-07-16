@@ -42,7 +42,6 @@ static CfgLexerKeyword kafka_keywords[] =
   { "key",            KW_KEY },
   { "message",        KW_MESSAGE },
   { "sync_send",      KW_SYNC_SEND},
-  { "properties_file", KW_PROPERTIES_FILE, KWS_OBSOLETE, "Please list the file content in the config() option." },
   { "bootstrap_servers", KW_BOOTSTRAP_SERVERS },
   { "workers",        KW_WORKERS },
   { "poll_timeout",   KW_POLL_TIMEOUT },

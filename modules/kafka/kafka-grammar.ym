@@ -65,7 +65,6 @@
 %token KW_POLL_TIMEOUT
 %token KW_BOOTSTRAP_SERVERS
 %token KW_SYNC_SEND
-%token KW_PROPERTIES_FILE
 
 %%
 
@@ -96,13 +95,6 @@ kafka_option
         {
             kafka_dd_merge_config(last_driver, $3);
         }
-        | KW_PROPERTIES_FILE '(' path_check ')'
-	  {
-            GList *file_props = kafka_read_properties_file($3);
-            free($3);
-            CHECK_ERROR(file_props != NULL, @3, "Unable to read java style properties file");
-            kafka_dd_merge_config(last_driver, file_props);
-          }
         | KW_KEY '(' template_content ')'
         {
             kafka_dd_set_key_ref(last_driver, $3);

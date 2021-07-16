@@ -37,6 +37,5 @@ typedef struct _KafkaProperty
 KafkaProperty *kafka_property_new(const gchar *name, const gchar *value);
 void kafka_property_free(KafkaProperty *self);
 void kafka_property_list_free(GList *l);
-GList *kafka_read_properties_file(const char *path);
 
 #endif

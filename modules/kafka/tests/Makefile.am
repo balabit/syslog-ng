@@ -50,5 +50,4 @@ modules_kafka_tests_test_kafka_topic_LDFLAGS	= \
 endif
 
 EXTRA_DIST += \
-	modules/kafka/tests/CMakeLists.txt	\
-	modules/kafka/tests/sample.properties
+	modules/kafka/tests/CMakeLists.txt

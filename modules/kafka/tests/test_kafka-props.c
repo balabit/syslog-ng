@@ -73,23 +73,6 @@ Test(kafka_props, kafka_prop_list_allocation_and_destruction)
   kafka_property_list_free(pl);
 }
 
-Test(kafka_props, kafka_read_properties_file_gets_keys_from_the_file)
-{
-  GList *pl = kafka_read_properties_file(TESTDATA_DIR "sample.properties");
-
-  _assert_nth_prop_equals(pl, 0, "name1", "value1");
-  _assert_nth_prop_equals(pl, 1, "name2", "value2");
-  _assert_nth_prop_equals(pl, 2, "name3", "value3");
-  _assert_nth_prop_equals(pl, 3, "name4",
-                          "continuation this continues on this and this line \\and this        but not on this \\");
-  _assert_nth_prop_equals(pl, 4, "name5", "value5");
-  _assert_nth_prop_equals(pl, 5, "namethatincludesequal=sign", "value");
-  _assert_nth_prop_equals(pl, 6, "namethatincludenewline\nhere", "value");
-  _assert_nth_prop_equals(pl, 7, "namethatincludetab\there", "value");
-  _assert_nth_prop_equals(pl, 8, "namethatincludeunicode@here", "value");
-  kafka_property_list_free(pl);
-}
-
 static void
 setup(void)
 {
